@@ -1,14 +1,49 @@
 import { useState, useEffect } from "react";
+import "./App.css";
+
+function getCurrentMonth() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+
+  return `${year}-${month}`;
+}
+
+function getTodayDate() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDate(dateString) {
+  const [year, month, day] = dateString.split("-").map(Number);
+
+  const localDate = new Date(year, month - 1, day);
+
+  return localDate.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 function App() {
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
   const [merchant, setMerchant] = useState("");
   const [description, setDescription] = useState("");
-  const [purchaseDate, setPurchaseDate] = useState("");
+  const [purchaseDate, setPurchaseDate] = useState(getTodayDate);
   const [notes, setNotes] = useState("");
 
   const [expenses, setExpenses] = useState([]);
+  const [editingExpenseId, setEditingExpenseId] = useState(null);
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth);
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [budgetAmount, setBudgetAmount] = useState("");
+  const [monthlyBudgetCents, setMonthlyBudgetCents] = useState(null);
 
   useEffect(() => {
     async function fetchExpenses() {
@@ -20,6 +55,44 @@ function App() {
 
     fetchExpenses();
   }, []);
+
+  useEffect(() => {
+    async function fetchMonthlyBudget() {
+      if (!selectedMonth) {
+        setMonthlyBudgetCents(null);
+        setBudgetAmount("");
+        return;
+      }
+
+      const response = await fetch(
+        `http://127.0.0.1:8000/budgets/${selectedMonth}`,
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+
+        setMonthlyBudgetCents(data.amount_cents);
+        setBudgetAmount((data.amount_cents / 100).toFixed(2));
+      } else if (response.status === 404) {
+        setMonthlyBudgetCents(null);
+        setBudgetAmount("");
+      } else {
+        console.log("Failed to load monthly budget");
+      }
+    }
+
+    fetchMonthlyBudget();
+  }, [selectedMonth]);
+
+  function resetForm() {
+    setEditingExpenseId(null);
+    setAmount("");
+    setCategory("");
+    setMerchant("");
+    setDescription("");
+    setPurchaseDate(getTodayDate());
+    setNotes("");
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -33,8 +106,16 @@ function App() {
       notes: notes || null,
     };
 
-    const response = await fetch("http://127.0.0.1:8000/expenses", {
-      method: "POST",
+    const isEditing = editingExpenseId !== null;
+
+    const url = isEditing
+      ? `http://127.0.0.1:8000/expenses/${editingExpenseId}`
+      : "http://127.0.0.1:8000/expenses";
+
+    const method = isEditing ? "PUT" : "POST";
+
+    const response = await fetch(url, {
+      method: method,
       headers: {
         "Content-Type": "application/json",
       },
@@ -42,18 +123,53 @@ function App() {
     });
 
     if (response.ok) {
-      const newExpense = await response.json();
+      const savedExpense = await response.json();
 
-      setExpenses((currentExpenses) => [newExpense, ...currentExpenses]);
+      if (isEditing) {
+        setExpenses((currentExpenses) =>
+          currentExpenses.map((expense) =>
+            expense.id === savedExpense.id ? savedExpense : expense,
+          ),
+        );
+      } else {
+        setExpenses((currentExpenses) => [savedExpense, ...currentExpenses]);
+      }
 
-      setAmount("");
-      setCategory("");
-      setMerchant("");
-      setDescription("");
-      setPurchaseDate("");
-      setNotes("");
+      resetForm();
     } else {
-      console.log("Failed to add expense");
+      console.log("Failed to save expense");
+    }
+  }
+
+  async function handleBudgetSubmit(event) {
+    event.preventDefault();
+
+    if (!selectedMonth) {
+      return;
+    }
+
+    const budgetData = {
+      amount_cents: Math.round(Number(budgetAmount) * 100),
+    };
+
+    const response = await fetch(
+      `http://127.0.0.1:8000/budgets/${selectedMonth}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(budgetData),
+      },
+    );
+
+    if (response.ok) {
+      const savedBudget = await response.json();
+
+      setMonthlyBudgetCents(savedBudget.amount_cents);
+      setBudgetAmount((savedBudget.amount_cents / 100).toFixed(2));
+    } else {
+      console.log("Failed to save monthly budget");
     }
   }
 
@@ -82,19 +198,65 @@ function App() {
     }
   }
 
-  const totalSpentCents = expenses.reduce(
+  function handleEdit(expense) {
+    setEditingExpenseId(expense.id);
+    setAmount((expense.amount_cents / 100).toFixed(2));
+    setCategory(expense.category);
+    setMerchant(expense.merchant || "");
+    setDescription(expense.description || "");
+    setPurchaseDate(expense.purchase_date);
+    setNotes(expense.notes || "");
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  const filteredExpenses = expenses.filter((expense) => {
+    const matchesMonth =
+      !selectedMonth || expense.purchase_date.startsWith(selectedMonth);
+
+    const matchesCategory =
+      selectedCategory === "All" || expense.category === selectedCategory;
+
+    return matchesMonth && matchesCategory;
+  });
+
+  const totalSpentCents = filteredExpenses.reduce(
     (total, expense) => total + expense.amount_cents,
     0,
   );
 
+  const monthlySpentCents = expenses
+    .filter(
+      (expense) =>
+        !selectedMonth || expense.purchase_date.startsWith(selectedMonth),
+    )
+    .reduce((total, expense) => total + expense.amount_cents, 0);
+
+  const remainingBudgetCents =
+    monthlyBudgetCents === null ? null : monthlyBudgetCents - monthlySpentCents;
+
+  const budgetUsedPercent =
+    monthlyBudgetCents === null
+      ? 0
+      : (monthlySpentCents / monthlyBudgetCents) * 100;
+
+  const progressWidth = Math.min(budgetUsedPercent, 100);
+
+  const isOverBudget =
+    remainingBudgetCents !== null && remainingBudgetCents < 0;
+
   return (
-    <div>
+    <main className="app">
       <h1>Budget</h1>
       <p>Track your spending without connecting your bank.</p>
 
-      <h2>Add Expense</h2>
+      <h2>{editingExpenseId === null ? "Add Expense" : "Edit Expense"}</h2>
 
-      <form onSubmit={handleSubmit}>
+      <form className="expense-form" onSubmit={handleSubmit}>
+        {" "}
         <div>
           <label>Amount</label>
           <input
@@ -106,7 +268,6 @@ function App() {
             onChange={(event) => setAmount(event.target.value)}
           />
         </div>
-
         <div>
           <label>Category</label>
           <select
@@ -127,7 +288,6 @@ function App() {
             <option value="Other">Other</option>
           </select>
         </div>
-
         <div>
           <label>Merchant</label>
           <input
@@ -136,7 +296,6 @@ function App() {
             onChange={(event) => setMerchant(event.target.value)}
           />
         </div>
-
         <div>
           <label>Description</label>
           <input
@@ -145,7 +304,6 @@ function App() {
             onChange={(event) => setDescription(event.target.value)}
           />
         </div>
-
         <div>
           <label>Purchase Date</label>
           <input
@@ -155,7 +313,6 @@ function App() {
             onChange={(event) => setPurchaseDate(event.target.value)}
           />
         </div>
-
         <div>
           <label>Notes</label>
           <textarea
@@ -163,37 +320,183 @@ function App() {
             onChange={(event) => setNotes(event.target.value)}
           />
         </div>
-
-        <button type="submit">Add Expense</button>
+        <button type="submit">
+          {editingExpenseId === null ? "Add Expense" : "Save Changes"}
+        </button>
+        {editingExpenseId !== null && (
+          <button type="button" onClick={resetForm}>
+            Cancel
+          </button>
+        )}
       </form>
 
       <h2>Expenses</h2>
-      <p>
-        <strong>Total spent: ${(totalSpentCents / 100).toFixed(2)}</strong>
-      </p>
+      <div className="expense-toolbar">
+        <div className="filter-control">
+          <label htmlFor="month-filter">Month</label>
 
-      {expenses.length === 0 ? (
-        <p>No expenses yet.</p>
+          <input
+            id="month-filter"
+            type="month"
+            value={selectedMonth}
+            onChange={(event) => setSelectedMonth(event.target.value)}
+          />
+        </div>
+
+        <div className="filter-control">
+          <label htmlFor="category-filter">Category</label>
+
+          <select
+            id="category-filter"
+            value={selectedCategory}
+            onChange={(event) => setSelectedCategory(event.target.value)}
+          >
+            <option value="All">All categories</option>
+            <option value="Groceries">Groceries</option>
+            <option value="Restaurants">Restaurants</option>
+            <option value="Transportation">Transportation</option>
+            <option value="Housing">Housing</option>
+            <option value="Utilities">Utilities</option>
+            <option value="Health">Health</option>
+            <option value="Shopping">Shopping</option>
+            <option value="Entertainment">Entertainment</option>
+            <option value="Education">Education</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+
+      <form className="budget-form" onSubmit={handleBudgetSubmit}>
+        <div className="budget-field">
+          <label htmlFor="budget-amount">Monthly budget</label>
+
+          <div className="budget-input">
+            <span>$</span>
+
+            <input
+              id="budget-amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              required
+              placeholder="500.00"
+              value={budgetAmount}
+              onChange={(event) => setBudgetAmount(event.target.value)}
+            />
+          </div>
+        </div>
+
+        <button type="submit">
+          {monthlyBudgetCents === null ? "Set Budget" : "Update Budget"}
+        </button>
+      </form>
+
+      <div className="summary-card">
+        <span>
+          {selectedCategory === "All"
+            ? "Total spent"
+            : `${selectedCategory} spent`}
+        </span>{" "}
+        <strong>${(totalSpentCents / 100).toFixed(2)}</strong>
+      </div>
+
+      {monthlyBudgetCents !== null && (
+        <section
+          className={`budget-status ${isOverBudget ? "over-budget" : ""}`}
+        >
+          <div className="budget-stats">
+            <div className="budget-stat">
+              <span>Monthly budget</span>
+              <strong>${(monthlyBudgetCents / 100).toFixed(2)}</strong>
+            </div>
+
+            <div className="budget-stat">
+              <span>Spent this month</span>
+              <strong>${(monthlySpentCents / 100).toFixed(2)}</strong>
+            </div>
+
+            <div className="budget-stat">
+              <span>{isOverBudget ? "Over budget" : "Remaining"}</span>
+
+              <strong>
+                ${(Math.abs(remainingBudgetCents) / 100).toFixed(2)}
+              </strong>
+            </div>
+          </div>
+
+          <div className="budget-progress">
+            <div
+              className="budget-progress-fill"
+              style={{
+                width: `${progressWidth}%`,
+              }}
+            />
+          </div>
+
+          <p className="budget-progress-text">
+            {budgetUsedPercent.toFixed(0)}% of the monthly budget used
+          </p>
+        </section>
+      )}
+
+      {filteredExpenses.length === 0 ? (
+        <p className="empty-message">No expenses found for this month.</p>
       ) : (
         <div>
-          {expenses.map((expense) => (
-            <div key={expense.id}>
-              <h3>{expense.merchant || "Unknown Merchant"}</h3>
+          {filteredExpenses.length === 0 ? (
+            <p className="empty-message">No expenses yet.</p>
+          ) : (
+            <div className="expense-list">
+              {filteredExpenses.map((expense) => (
+                <article className="expense-card" key={expense.id}>
+                  <div className="expense-card-header">
+                    <div>
+                      <p className="expense-category">{expense.category}</p>
 
-              <p>${(expense.amount_cents / 100).toFixed(2)}</p>
+                      <h3>{expense.merchant || "Unknown Merchant"}</h3>
+                    </div>
 
-              <p>{expense.category}</p>
+                    <p className="expense-amount">
+                      ${(expense.amount_cents / 100).toFixed(2)}
+                    </p>
+                  </div>
 
-              <p>{expense.purchase_date}</p>
+                  {expense.description && (
+                    <p className="expense-description">{expense.description}</p>
+                  )}
 
-              <button type="button" onClick={() => handleDelete(expense.id)}>
-                Delete
-              </button>
+                  {expense.notes && (
+                    <p className="expense-notes">{expense.notes}</p>
+                  )}
+
+                  <p className="expense-date">
+                    {formatDate(expense.purchase_date)}
+                  </p>
+
+                  <div className="expense-actions">
+                    <button
+                      className="edit-button"
+                      type="button"
+                      onClick={() => handleEdit(expense)}
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      className="delete-button"
+                      type="button"
+                      onClick={() => handleDelete(expense.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
-    </div>
+    </main>
   );
 }
 

@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException
+# main.py
+from fastapi import FastAPI, Depends, HTTPException, Path
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -22,6 +23,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 def get_db():
     db = SessionLocal()
 
@@ -30,9 +32,11 @@ def get_db():
     finally:
         db.close()
 
+
 @app.get("/")
 def home():
     return {"message": "Budget API is running"}
+
 
 @app.post("/expenses", response_model=schemas.ExpenseResponse)
 def create_expense(
@@ -62,7 +66,7 @@ def get_expenses(db: Session = Depends(get_db)):
         .order_by(models.Expense.purchase_date.desc())
         .all()
     )
-    
+
     return expenses
 
 
@@ -87,6 +91,7 @@ def delete_expense(
     db.commit()
 
     return {"message": "Expense deleted"}
+
 
 @app.put("/expenses/{expense_id}", response_model=schemas.ExpenseResponse)
 def update_expense(
@@ -118,6 +123,7 @@ def update_expense(
 
     return expense
 
+
 @app.get("/expenses/{expense_id}", response_model=schemas.ExpenseResponse)
 def get_expense(
     expense_id: int,
@@ -136,3 +142,61 @@ def get_expense(
         )
 
     return expense
+
+
+@app.put(
+    "/budgets/{budget_month}",
+    response_model=schemas.MonthlyBudgetResponse
+)
+def upsert_monthly_budget(
+    budget_data: schemas.MonthlyBudgetUpsert,
+    budget_month: str = Path(
+        pattern=r"^\d{4}-(0[1-9]|1[0-2])$"
+    ),
+    db: Session = Depends(get_db)
+):
+    monthly_budget = (
+        db.query(models.MonthlyBudget)
+        .filter(models.MonthlyBudget.month == budget_month)
+        .first()
+    )
+
+    if monthly_budget is None:
+        monthly_budget = models.MonthlyBudget(
+            month=budget_month,
+            amount_cents=budget_data.amount_cents
+        )
+
+        db.add(monthly_budget)
+    else:
+        monthly_budget.amount_cents = budget_data.amount_cents
+
+    db.commit()
+    db.refresh(monthly_budget)
+
+    return monthly_budget
+
+
+@app.get(
+    "/budgets/{budget_month}",
+    response_model=schemas.MonthlyBudgetResponse
+)
+def get_monthly_budget(
+    budget_month: str = Path(
+        pattern=r"^\d{4}-(0[1-9]|1[0-2])$"
+    ),
+    db: Session = Depends(get_db)
+):
+    monthly_budget = (
+        db.query(models.MonthlyBudget)
+        .filter(models.MonthlyBudget.month == budget_month)
+        .first()
+    )
+
+    if monthly_budget is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Monthly budget not found"
+        )
+
+    return monthly_budget
