@@ -976,3 +976,54 @@
   color: #64748b;
   font-size: 0.88rem;
 }
+
+.price-change-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 13px 16px;
+  border: 1px solid;
+  border-radius: 10px;
+}
+
+.price-change-summary span {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.price-change-summary strong {
+  font-size: 0.95rem;
+  text-align: right;
+}
+
+.price-increase {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.price-decrease {
+  color: #0f766e;
+  background: #f0fdfa;
+  border-color: #99f6e4;
+}
+
+.price-unchanged {
+  color: #475569;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+@media (max-width: 500px) {
+  .price-change-summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .price-change-summary strong {
+    text-align: left;
+  }
+}

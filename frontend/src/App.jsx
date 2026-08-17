@@ -457,6 +457,25 @@ function App() {
     ? selectedExpenseForItems.amount_cents - itemSubtotalCents
     : 0;
 
+  const latestHistoryEntry = priceHistory[0] ?? null;
+  const previousHistoryEntry = priceHistory[1] ?? null;
+
+  const canComparePrices =
+    latestHistoryEntry !== null &&
+    previousHistoryEntry !== null &&
+    latestHistoryEntry.unit.toLowerCase() ===
+      previousHistoryEntry.unit.toLowerCase();
+
+  const priceChangeCents = canComparePrices
+    ? latestHistoryEntry.unit_price_cents -
+      previousHistoryEntry.unit_price_cents
+    : 0;
+
+  const priceChangePercent =
+    canComparePrices && previousHistoryEntry.unit_price_cents > 0
+      ? (priceChangeCents / previousHistoryEntry.unit_price_cents) * 100
+      : 0;
+
   return (
     <main className="app">
       <header className="app-header">
@@ -873,6 +892,33 @@ function App() {
                 ×
               </button>
             </div>
+
+            {canComparePrices && (
+              <div
+                className={`price-change-summary ${
+                  priceChangeCents > 0
+                    ? "price-increase"
+                    : priceChangeCents < 0
+                      ? "price-decrease"
+                      : "price-unchanged"
+                }`}
+              >
+                <span>Since previous purchase</span>
+
+                <strong>
+                  {priceChangeCents === 0 ? (
+                    "No price change"
+                  ) : (
+                    <>
+                      {priceChangeCents > 0 ? "↑" : "↓"} $
+                      {Math.abs(priceChangeCents / 100).toFixed(2)} (
+                      {priceChangeCents > 0 ? "+" : "-"}
+                      {Math.abs(priceChangePercent).toFixed(1)}%)
+                    </>
+                  )}
+                </strong>
+              </div>
+            )}
 
             {isLoadingPriceHistory ? (
               <p className="items-message">Loading price history...</p>
