@@ -610,3 +610,369 @@
 .item-row > strong {
   white-space: nowrap;
 }
+
+.item-form {
+  display: grid;
+  grid-template-columns:
+    minmax(160px, 2fr)
+    minmax(90px, 0.7fr)
+    minmax(110px, 0.8fr)
+    minmax(110px, 0.8fr)
+    auto;
+  align-items: end;
+  gap: 10px;
+  margin-bottom: 22px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.item-form > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.item-form label {
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.item-form input,
+.item-form select {
+  width: 100%;
+  padding: 9px 10px;
+  color: #0f172a;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  outline: none;
+}
+
+.item-form input:focus,
+.item-form select:focus {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgb(15 118 110 / 15%);
+}
+
+.item-form button {
+  padding: 10px 14px;
+  color: #ffffff;
+  background: #0f766e;
+  border: 0;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.item-form button:hover {
+  background: #115e59;
+}
+
+@media (max-width: 760px) {
+  .item-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .item-name-field {
+    grid-column: 1 / -1;
+  }
+
+  .item-form button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 500px) {
+  .item-form {
+    grid-template-columns: 1fr;
+  }
+
+  .item-name-field {
+    grid-column: auto;
+  }
+}
+
+.item-balance {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: -8px 0 18px;
+}
+
+.item-balance > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.item-balance span {
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.item-balance strong {
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+/* Money still needs to be accounted for */
+.item-balance > div:last-child {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.item-balance > div:last-child strong {
+  color: #b45309;
+}
+
+/* All items match the transaction total */
+.item-balance > .item-balance-complete {
+  background: #f0fdfa;
+  border-color: #99f6e4;
+}
+
+.item-balance > .item-balance-complete strong {
+  color: #0f766e;
+}
+
+/* Entered items exceed the transaction total */
+.item-balance > .item-balance-over {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.item-balance > .item-balance-over strong {
+  color: #dc2626;
+}
+
+@media (max-width: 650px) {
+  .item-balance {
+    grid-template-columns: 1fr;
+  }
+}
+
+.items-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.edit-items-toggle {
+  padding: 8px 13px;
+  color: #0f766e;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.edit-items-toggle:hover {
+  background: #ccfbf1;
+}
+
+.edit-items-toggle.active {
+  color: #ffffff;
+  background: #0f766e;
+  border-color: #0f766e;
+}
+
+.item-row > .item-row-end {
+  align-items: flex-end;
+}
+
+.item-row-total {
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.item-row-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+}
+
+.item-row-actions button {
+  padding: 6px 10px;
+  background: transparent;
+  border-radius: 7px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.item-edit-button {
+  color: #0f766e;
+  border: 1px solid #5eead4;
+}
+
+.item-edit-button:hover {
+  background: #f0fdfa;
+}
+
+.item-delete-button {
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.item-delete-button:hover {
+  background: #fef2f2;
+}
+
+.item-row-edit-form {
+  display: grid;
+  grid-template-columns:
+    minmax(160px, 2fr)
+    minmax(75px, 0.65fr)
+    minmax(100px, 0.9fr)
+    minmax(100px, 1fr)
+    auto;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.item-row-edit-form input,
+.item-row-edit-form select {
+  min-width: 0;
+  width: 100%;
+  padding: 9px 10px;
+  color: #0f172a;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  outline: none;
+}
+
+.item-row-edit-form input:focus,
+.item-row-edit-form select:focus {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgb(15 118 110 / 15%);
+}
+
+.inline-item-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.inline-item-actions button {
+  padding: 9px 11px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.inline-save-button {
+  color: #ffffff;
+  background: #0f766e;
+  border: 1px solid #0f766e;
+}
+
+.inline-save-button:hover {
+  background: #115e59;
+}
+
+.inline-cancel-button {
+  color: #475569;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+}
+
+.inline-cancel-button:hover {
+  background: #f1f5f9;
+}
+
+@media (max-width: 650px) {
+  .item-row-edit-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .item-row-edit-form > input:first-child,
+  .inline-item-actions {
+    grid-column: 1 / -1;
+  }
+}
+
+.item-row > .item-row-end {
+  gap: 7px;
+}
+
+.item-history-button {
+  padding: 5px 9px;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.item-history-button:hover {
+  color: #0f766e;
+  background: #f0fdfa;
+  border-color: #5eead4;
+}
+
+.price-history-overlay {
+  z-index: 1100;
+}
+
+.price-history-modal {
+  width: min(calc(100% - 32px), 620px);
+}
+
+.price-history-modal .modal-header {
+  margin-bottom: 22px;
+}
+
+.price-history-list {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.price-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 18px;
+}
+
+.price-history-row + .price-history-row {
+  border-top: 1px solid #e2e8f0;
+}
+
+.price-history-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.price-history-row > div:last-child {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.price-history-row strong {
+  color: #0f172a;
+}
+
+.price-history-row span {
+  color: #64748b;
+  font-size: 0.88rem;
+}

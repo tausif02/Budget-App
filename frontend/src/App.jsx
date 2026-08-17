@@ -51,6 +51,18 @@ function App() {
   const [expenseItems, setExpenseItems] = useState([]);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
 
+  const [itemName, setItemName] = useState("");
+  const [itemQuantity, setItemQuantity] = useState("1");
+  const [itemUnit, setItemUnit] = useState("each");
+  const [itemUnitPrice, setItemUnitPrice] = useState("");
+
+  const [isEditingItemList, setIsEditingItemList] = useState(false);
+  const [editingItemId, setEditingItemId] = useState(null);
+
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
+  const [priceHistory, setPriceHistory] = useState([]);
+  const [isLoadingPriceHistory, setIsLoadingPriceHistory] = useState(false);
+
   useEffect(() => {
     async function fetchExpenses() {
       const response = await fetch("http://127.0.0.1:8000/expenses");
@@ -108,6 +120,13 @@ function App() {
   function closeExpenseModal() {
     resetForm();
     setIsExpenseModalOpen(false);
+  }
+
+  function resetItemForm() {
+    setItemName("");
+    setItemQuantity("1");
+    setItemUnit("each");
+    setItemUnitPrice("");
   }
 
   async function handleSubmit(event) {
@@ -215,6 +234,9 @@ function App() {
   }
 
   async function openItemsModal(expense) {
+    setIsEditingItemList(false);
+    setEditingItemId(null);
+    resetItemForm();
     setSelectedExpenseForItems(expense);
     setExpenseItems([]);
     setIsLoadingItems(true);
@@ -237,9 +259,139 @@ function App() {
     }
   }
 
+  async function openPriceHistory(item) {
+    setSelectedHistoryItem(item);
+    setPriceHistory([]);
+    setIsLoadingPriceHistory(true);
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/items/price-history?name=${encodeURIComponent(
+          item.name,
+        )}`,
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setPriceHistory(data);
+      } else {
+        console.log("Failed to load price history");
+      }
+    } catch (error) {
+      console.log("Failed to connect to the API", error);
+    } finally {
+      setIsLoadingPriceHistory(false);
+    }
+  }
+
+  function closePriceHistory() {
+    setSelectedHistoryItem(null);
+    setPriceHistory([]);
+  }
+  async function handleDeleteItem(itemId) {
+    if (!selectedExpenseForItems) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this item?",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const response = await fetch(
+      `http://127.0.0.1:8000/expenses/${selectedExpenseForItems.id}/items/${itemId}`,
+      {
+        method: "DELETE",
+      },
+    );
+
+    if (response.ok) {
+      setExpenseItems((currentItems) =>
+        currentItems.filter((item) => item.id !== itemId),
+      );
+
+      if (editingItemId === itemId) {
+        setEditingItemId(null);
+        resetItemForm();
+      }
+    } else {
+      console.log("Failed to delete item");
+    }
+  }
+
+  function handleCancelItemEdit() {
+    setEditingItemId(null);
+    resetItemForm();
+  }
+
+  function handleStartEditingItem(item) {
+    setEditingItemId(item.id);
+    setItemName(item.name);
+    setItemQuantity(String(item.quantity));
+    setItemUnit(item.unit);
+    setItemUnitPrice((item.unit_price_cents / 100).toFixed(2));
+  }
+
+  async function handleAddItem(event) {
+    event.preventDefault();
+
+    if (!selectedExpenseForItems) {
+      return;
+    }
+
+    const itemData = {
+      name: itemName.trim(),
+      quantity: Number(itemQuantity),
+      unit: itemUnit,
+      unit_price_cents: Math.round(Number(itemUnitPrice) * 100),
+    };
+
+    const isEditingItem = editingItemId !== null;
+
+    const url = isEditingItem
+      ? `http://127.0.0.1:8000/expenses/${selectedExpenseForItems.id}/items/${editingItemId}`
+      : `http://127.0.0.1:8000/expenses/${selectedExpenseForItems.id}/items`;
+
+    const response = await fetch(url, {
+      method: isEditingItem ? "PUT" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(itemData),
+    });
+
+    if (response.ok) {
+      const savedItem = await response.json();
+
+      if (isEditingItem) {
+        setExpenseItems((currentItems) =>
+          currentItems.map((item) =>
+            item.id === savedItem.id ? savedItem : item,
+          ),
+        );
+      } else {
+        setExpenseItems((currentItems) => [...currentItems, savedItem]);
+      }
+
+      setEditingItemId(null);
+      resetItemForm();
+    } else {
+      console.log("Failed to save item");
+    }
+  }
+
   function closeItemsModal() {
     setSelectedExpenseForItems(null);
     setExpenseItems([]);
+    setIsEditingItemList(false);
+    setEditingItemId(null);
+    setSelectedHistoryItem(null);
+    setPriceHistory([]);
+    setIsLoadingPriceHistory(false);
+    resetItemForm();
   }
 
   function handleEdit(expense) {
@@ -252,6 +404,12 @@ function App() {
     setNotes(expense.notes || "");
 
     setIsExpenseModalOpen(true);
+  }
+
+  function toggleItemListEditing() {
+    setIsEditingItemList((currentMode) => !currentMode);
+    setEditingItemId(null);
+    resetItemForm();
   }
 
   const filteredExpenses = expenses.filter((expense) => {
@@ -288,6 +446,16 @@ function App() {
 
   const isOverBudget =
     remainingBudgetCents !== null && remainingBudgetCents < 0;
+
+  const itemSubtotalCents = expenseItems.reduce(
+    (total, item) =>
+      total + Math.round(Number(item.quantity) * item.unit_price_cents),
+    0,
+  );
+
+  const unaccountedCents = selectedExpenseForItems
+    ? selectedExpenseForItems.amount_cents - itemSubtotalCents
+    : 0;
 
   return (
     <main className="app">
@@ -432,14 +600,26 @@ function App() {
                 </h2>
               </div>
 
-              <button
-                className="modal-close"
-                type="button"
-                aria-label="Close items"
-                onClick={closeItemsModal}
-              >
-                ×
-              </button>
+              <div className="items-header-actions">
+                {expenseItems.length > 0 && (
+                  <button
+                    className={`edit-items-toggle ${isEditingItemList ? "active" : ""}`}
+                    type="button"
+                    onClick={toggleItemListEditing}
+                  >
+                    {isEditingItemList ? "Done" : "Edit List"}
+                  </button>
+                )}
+
+                <button
+                  className="modal-close"
+                  type="button"
+                  aria-label="Close items"
+                  onClick={closeItemsModal}
+                >
+                  ×
+                </button>
+              </div>
             </div>
 
             <p className="items-transaction-total">
@@ -449,6 +629,91 @@ function App() {
               </strong>
             </p>
 
+            <div className="item-balance">
+              <div>
+                <span>Items entered</span>
+                <strong>${(itemSubtotalCents / 100).toFixed(2)}</strong>
+              </div>
+
+              <div
+                className={
+                  unaccountedCents === 0
+                    ? "item-balance-complete"
+                    : unaccountedCents < 0
+                      ? "item-balance-over"
+                      : ""
+                }
+              >
+                <span>{unaccountedCents < 0 ? "Over by" : "Unaccounted"}</span>
+
+                <strong>
+                  ${(Math.abs(unaccountedCents) / 100).toFixed(2)}
+                </strong>
+              </div>
+            </div>
+
+            {editingItemId === null && (
+              <form className="item-form" onSubmit={handleAddItem}>
+                <div className="item-name-field">
+                  <label htmlFor="item-name">Item name</label>
+
+                  <input
+                    id="item-name"
+                    type="text"
+                    required
+                    placeholder="Milk"
+                    value={itemName}
+                    onChange={(event) => setItemName(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="item-quantity">Quantity</label>
+
+                  <input
+                    id="item-quantity"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
+                    value={itemQuantity}
+                    onChange={(event) => setItemQuantity(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="item-unit">Unit</label>
+
+                  <select
+                    id="item-unit"
+                    value={itemUnit}
+                    onChange={(event) => setItemUnit(event.target.value)}
+                  >
+                    <option value="each">Each</option>
+                    <option value="pack">Pack</option>
+                    <option value="lb">Pound</option>
+                    <option value="oz">Ounce</option>
+                    <option value="gallon">Gallon</option>
+                    <option value="liter">Liter</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="item-price">Unit price</label>
+
+                  <input
+                    id="item-price"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
+                    placeholder="3.99"
+                    value={itemUnitPrice}
+                    onChange={(event) => setItemUnitPrice(event.target.value)}
+                  />
+                </div>
+                <button type="submit">
+                  {editingItemId === null ? "Add Item" : "Save Item"}
+                </button>{" "}
+              </form>
+            )}
             {isLoadingItems ? (
               <p className="items-message">Loading items...</p>
             ) : expenseItems.length === 0 ? (
@@ -457,23 +722,182 @@ function App() {
               </p>
             ) : (
               <div className="items-list">
-                {expenseItems.map((item) => (
-                  <div className="item-row" key={item.id}>
-                    <div>
-                      <strong>{item.name}</strong>
+                {expenseItems.map((item) =>
+                  editingItemId === item.id ? (
+                    <form
+                      className="item-row-edit-form"
+                      key={item.id}
+                      onSubmit={handleAddItem}
+                    >
+                      <input
+                        type="text"
+                        required
+                        aria-label="Item name"
+                        value={itemName}
+                        onChange={(event) => setItemName(event.target.value)}
+                      />
 
-                      <span>
-                        {item.quantity} {item.unit} × $
-                        {(item.unit_price_cents / 100).toFixed(2)}
-                      </span>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        required
+                        aria-label="Quantity"
+                        value={itemQuantity}
+                        onChange={(event) =>
+                          setItemQuantity(event.target.value)
+                        }
+                      />
+
+                      <select
+                        aria-label="Unit"
+                        value={itemUnit}
+                        onChange={(event) => setItemUnit(event.target.value)}
+                      >
+                        <option value="each">Each</option>
+                        <option value="pack">Pack</option>
+                        <option value="lb">Pound</option>
+                        <option value="oz">Ounce</option>
+                        <option value="gallon">Gallon</option>
+                        <option value="liter">Liter</option>
+                      </select>
+
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        required
+                        aria-label="Unit price"
+                        value={itemUnitPrice}
+                        onChange={(event) =>
+                          setItemUnitPrice(event.target.value)
+                        }
+                      />
+
+                      <div className="inline-item-actions">
+                        <button className="inline-save-button" type="submit">
+                          Save
+                        </button>
+
+                        <button
+                          className="inline-cancel-button"
+                          type="button"
+                          onClick={handleCancelItemEdit}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="item-row" key={item.id}>
+                      <div className="item-details">
+                        <strong>{item.name}</strong>
+
+                        <span>
+                          {item.quantity} {item.unit} × $
+                          {(item.unit_price_cents / 100).toFixed(2)}
+                        </span>
+                      </div>
+
+                      <div className="item-row-end">
+                        <strong className="item-row-total">
+                          $
+                          {(
+                            (item.quantity * item.unit_price_cents) /
+                            100
+                          ).toFixed(2)}
+                        </strong>
+                        <button
+                          className="item-history-button"
+                          type="button"
+                          onClick={() => openPriceHistory(item)}
+                        >
+                          History
+                        </button>
+                        {isEditingItemList && (
+                          <div className="item-row-actions">
+                            <button
+                              className="item-edit-button"
+                              type="button"
+                              onClick={() => handleStartEditingItem(item)}
+                            >
+                              Edit
+                            </button>
+
+                            <button
+                              className="item-delete-button"
+                              type="button"
+                              onClick={() => handleDeleteItem(item.id)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ),
+                )}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {selectedHistoryItem && (
+        <div
+          className="modal-overlay price-history-overlay"
+          onMouseDown={closePriceHistory}
+        >
+          <section
+            className="expense-modal price-history-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="price-history-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <p>Price tracking</p>
+
+                <h2 id="price-history-title">
+                  {selectedHistoryItem.name} history
+                </h2>
+              </div>
+
+              <button
+                className="modal-close"
+                type="button"
+                aria-label="Close price history"
+                onClick={closePriceHistory}
+              >
+                ×
+              </button>
+            </div>
+
+            {isLoadingPriceHistory ? (
+              <p className="items-message">Loading price history...</p>
+            ) : priceHistory.length === 0 ? (
+              <p className="items-message">
+                No previous purchases found for this item.
+              </p>
+            ) : (
+              <div className="price-history-list">
+                {priceHistory.map((entry) => (
+                  <div className="price-history-row" key={entry.item_id}>
+                    <div>
+                      <strong>{formatDate(entry.purchase_date)}</strong>
+                      <span>{entry.merchant || "Unknown Merchant"}</span>
                     </div>
 
-                    <strong>
-                      $
-                      {((item.quantity * item.unit_price_cents) / 100).toFixed(
-                        2,
-                      )}
-                    </strong>
+                    <div>
+                      <strong>
+                        ${(entry.unit_price_cents / 100).toFixed(2)}
+                      </strong>
+
+                      <span>
+                        {entry.quantity} {entry.unit}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>

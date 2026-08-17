@@ -1,7 +1,9 @@
 # main.py
-from fastapi import FastAPI, Depends, HTTPException, Path
+from fastapi import FastAPI, Depends, HTTPException, Path, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import func
+
 
 from database import engine, Base, SessionLocal
 import models
@@ -266,3 +268,107 @@ def get_expense_items(
     )
 
     return items
+
+
+@app.put(
+    "/expenses/{expense_id}/items/{item_id}",
+    response_model=schemas.ExpenseItemResponse
+)
+def update_expense_item(
+    expense_id: int,
+    item_id: int,
+    updated_item: schemas.ExpenseItemUpdate,
+    db: Session = Depends(get_db)
+):
+    item = (
+        db.query(models.ExpenseItem)
+        .filter(
+            models.ExpenseItem.id == item_id,
+            models.ExpenseItem.expense_id == expense_id
+        )
+        .first()
+    )
+
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Expense item not found"
+        )
+
+    item.name = updated_item.name.strip()
+    item.quantity = updated_item.quantity
+    item.unit = updated_item.unit
+    item.unit_price_cents = updated_item.unit_price_cents
+
+    db.commit()
+    db.refresh(item)
+
+    return item
+
+
+@app.delete("/expenses/{expense_id}/items/{item_id}")
+def delete_expense_item(
+    expense_id: int,
+    item_id: int,
+    db: Session = Depends(get_db)
+):
+    item = (
+        db.query(models.ExpenseItem)
+        .filter(
+            models.ExpenseItem.id == item_id,
+            models.ExpenseItem.expense_id == expense_id
+        )
+        .first()
+    )
+
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Expense item not found"
+        )
+
+    db.delete(item)
+    db.commit()
+
+    return {"message": "Expense item deleted"}
+
+
+@app.get(
+    "/items/price-history",
+    response_model=list[schemas.ItemPriceHistoryResponse]
+)
+def get_item_price_history(
+    name: str = Query(min_length=1),
+    db: Session = Depends(get_db)
+):
+    normalized_name = name.strip().lower()
+
+    results = (
+        db.query(models.ExpenseItem, models.Expense)
+        .join(
+            models.Expense,
+            models.Expense.id == models.ExpenseItem.expense_id
+        )
+        .filter(
+            func.lower(models.ExpenseItem.name) == normalized_name
+        )
+        .order_by(
+            models.Expense.purchase_date.desc(),
+            models.ExpenseItem.id.desc()
+        )
+        .all()
+    )
+
+    return [
+        {
+            "item_id": item.id,
+            "expense_id": expense.id,
+            "name": item.name,
+            "quantity": item.quantity,
+            "unit": item.unit,
+            "unit_price_cents": item.unit_price_cents,
+            "merchant": expense.merchant,
+            "purchase_date": expense.purchase_date
+        }
+        for item, expense in results
+    ]

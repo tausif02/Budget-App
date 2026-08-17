@@ -31,6 +31,13 @@ class ExpenseItemCreate(BaseModel):
     unit_price_cents: int = Field(gt=0)
 
 
+class ExpenseItemUpdate(BaseModel):
+    name: str = Field(min_length=1)
+    quantity: float = Field(gt=0)
+    unit: str = Field(min_length=1)
+    unit_price_cents: int = Field(gt=0)
+
+
 class ExpenseItemResponse(ExpenseItemCreate):
     id: int
     expense_id: int
@@ -56,3 +63,14 @@ class MonthlyBudgetResponse(MonthlyBudgetUpsert):
 
     class Config:
         from_attributes = True
+
+
+class ItemPriceHistoryResponse(BaseModel):
+    item_id: int
+    expense_id: int
+    name: str
+    quantity: float
+    unit: str
+    unit_price_cents: int
+    merchant: str | None
+    purchase_date: date
