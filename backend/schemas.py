@@ -21,6 +21,24 @@ class ExpenseUpdate(BaseModel):
     notes: str | None = None
 
 
+class ExpenseItemCreate(BaseModel):
+    name: str = Field(min_length=1)
+    quantity: float = Field(gt=0)
+    unit: str = Field(
+        default="each",
+        min_length=1
+    )
+    unit_price_cents: int = Field(gt=0)
+
+
+class ExpenseItemResponse(ExpenseItemCreate):
+    id: int
+    expense_id: int
+
+    class Config:
+        from_attributes = True
+
+
 class ExpenseResponse(ExpenseCreate):
     id: int
 

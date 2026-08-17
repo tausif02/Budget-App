@@ -45,6 +45,12 @@ function App() {
   const [budgetAmount, setBudgetAmount] = useState("");
   const [monthlyBudgetCents, setMonthlyBudgetCents] = useState(null);
 
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [selectedExpenseForItems, setSelectedExpenseForItems] = useState(null);
+
+  const [expenseItems, setExpenseItems] = useState([]);
+  const [isLoadingItems, setIsLoadingItems] = useState(false);
+
   useEffect(() => {
     async function fetchExpenses() {
       const response = await fetch("http://127.0.0.1:8000/expenses");
@@ -94,6 +100,16 @@ function App() {
     setNotes("");
   }
 
+  function openAddExpenseModal() {
+    resetForm();
+    setIsExpenseModalOpen(true);
+  }
+
+  function closeExpenseModal() {
+    resetForm();
+    setIsExpenseModalOpen(false);
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
 
@@ -135,7 +151,7 @@ function App() {
         setExpenses((currentExpenses) => [savedExpense, ...currentExpenses]);
       }
 
-      resetForm();
+      closeExpenseModal();
     } else {
       console.log("Failed to save expense");
     }
@@ -198,6 +214,34 @@ function App() {
     }
   }
 
+  async function openItemsModal(expense) {
+    setSelectedExpenseForItems(expense);
+    setExpenseItems([]);
+    setIsLoadingItems(true);
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/expenses/${expense.id}/items`,
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setExpenseItems(data);
+      } else {
+        console.log("Failed to load expense items");
+      }
+    } catch (error) {
+      console.log("Failed to connect to the API", error);
+    } finally {
+      setIsLoadingItems(false);
+    }
+  }
+
+  function closeItemsModal() {
+    setSelectedExpenseForItems(null);
+    setExpenseItems([]);
+  }
+
   function handleEdit(expense) {
     setEditingExpenseId(expense.id);
     setAmount((expense.amount_cents / 100).toFixed(2));
@@ -207,10 +251,7 @@ function App() {
     setPurchaseDate(expense.purchase_date);
     setNotes(expense.notes || "");
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+    setIsExpenseModalOpen(true);
   }
 
   const filteredExpenses = expenses.filter((expense) => {
@@ -250,85 +291,196 @@ function App() {
 
   return (
     <main className="app">
-      <h1>Budget</h1>
-      <p>Track your spending without connecting your bank.</p>
+      <header className="app-header">
+        <div>
+          <h1>Budget</h1>
+          <p>Track your spending without connecting your bank.</p>
+        </div>
 
-      <h2>{editingExpenseId === null ? "Add Expense" : "Edit Expense"}</h2>
-
-      <form className="expense-form" onSubmit={handleSubmit}>
-        {" "}
-        <div>
-          <label>Amount</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0.01"
-            required
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-          />
-        </div>
-        <div>
-          <label>Category</label>
-          <select
-            value={category}
-            required
-            onChange={(event) => setCategory(event.target.value)}
-          >
-            <option value="">Select a category</option>
-            <option value="Groceries">Groceries</option>
-            <option value="Restaurants">Restaurants</option>
-            <option value="Transportation">Transportation</option>
-            <option value="Housing">Housing</option>
-            <option value="Utilities">Utilities</option>
-            <option value="Health">Health</option>
-            <option value="Shopping">Shopping</option>
-            <option value="Entertainment">Entertainment</option>
-            <option value="Education">Education</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-        <div>
-          <label>Merchant</label>
-          <input
-            type="text"
-            value={merchant}
-            onChange={(event) => setMerchant(event.target.value)}
-          />
-        </div>
-        <div>
-          <label>Description</label>
-          <input
-            type="text"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        </div>
-        <div>
-          <label>Purchase Date</label>
-          <input
-            type="date"
-            required
-            value={purchaseDate}
-            onChange={(event) => setPurchaseDate(event.target.value)}
-          />
-        </div>
-        <div>
-          <label>Notes</label>
-          <textarea
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-          />
-        </div>
-        <button type="submit">
-          {editingExpenseId === null ? "Add Expense" : "Save Changes"}
+        <button
+          className="add-transaction-button"
+          type="button"
+          onClick={openAddExpenseModal}
+        >
+          + Add New Transaction
         </button>
-        {editingExpenseId !== null && (
-          <button type="button" onClick={resetForm}>
-            Cancel
-          </button>
-        )}
-      </form>
+      </header>
+
+      {isExpenseModalOpen && (
+        <div className="modal-overlay" onMouseDown={closeExpenseModal}>
+          <section
+            className="expense-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="transaction-modal-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <p>Transaction</p>
+
+                <h2 id="transaction-modal-title">
+                  {editingExpenseId === null
+                    ? "Add New Transaction"
+                    : "Edit Transaction"}
+                </h2>
+              </div>
+
+              <button
+                className="modal-close"
+                type="button"
+                aria-label="Close transaction form"
+                onClick={closeExpenseModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <form className="expense-form" onSubmit={handleSubmit}>
+              {" "}
+              <div>
+                <label>Amount</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                />
+              </div>
+              <div>
+                <label>Category</label>
+                <select
+                  value={category}
+                  required
+                  onChange={(event) => setCategory(event.target.value)}
+                >
+                  <option value="">Select a category</option>
+                  <option value="Groceries">Groceries</option>
+                  <option value="Restaurants">Restaurants</option>
+                  <option value="Transportation">Transportation</option>
+                  <option value="Housing">Housing</option>
+                  <option value="Utilities">Utilities</option>
+                  <option value="Health">Health</option>
+                  <option value="Shopping">Shopping</option>
+                  <option value="Entertainment">Entertainment</option>
+                  <option value="Education">Education</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label>Merchant</label>
+                <input
+                  type="text"
+                  value={merchant}
+                  onChange={(event) => setMerchant(event.target.value)}
+                />
+              </div>
+              <div>
+                <label>Description</label>
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                />
+              </div>
+              <div>
+                <label>Purchase Date</label>
+                <input
+                  type="date"
+                  required
+                  value={purchaseDate}
+                  onChange={(event) => setPurchaseDate(event.target.value)}
+                />
+              </div>
+              <div>
+                <label>Notes</label>
+                <textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                />
+              </div>
+              <button type="submit">
+                {editingExpenseId === null ? "Add Transaction" : "Save Changes"}
+              </button>
+              {editingExpenseId !== null && (
+                <button type="button" onClick={closeExpenseModal}>
+                  Cancel
+                </button>
+              )}
+            </form>
+          </section>
+        </div>
+      )}
+
+      {selectedExpenseForItems && (
+        <div className="modal-overlay" onMouseDown={closeItemsModal}>
+          <section
+            className="expense-modal items-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="items-modal-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <p>Transaction items</p>
+
+                <h2 id="items-modal-title">
+                  {selectedExpenseForItems.merchant || "Unknown Merchant"}
+                </h2>
+              </div>
+
+              <button
+                className="modal-close"
+                type="button"
+                aria-label="Close items"
+                onClick={closeItemsModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <p className="items-transaction-total">
+              Transaction total:{" "}
+              <strong>
+                ${(selectedExpenseForItems.amount_cents / 100).toFixed(2)}
+              </strong>
+            </p>
+
+            {isLoadingItems ? (
+              <p className="items-message">Loading items...</p>
+            ) : expenseItems.length === 0 ? (
+              <p className="items-message">
+                No items have been added to this transaction.
+              </p>
+            ) : (
+              <div className="items-list">
+                {expenseItems.map((item) => (
+                  <div className="item-row" key={item.id}>
+                    <div>
+                      <strong>{item.name}</strong>
+
+                      <span>
+                        {item.quantity} {item.unit} × $
+                        {(item.unit_price_cents / 100).toFixed(2)}
+                      </span>
+                    </div>
+
+                    <strong>
+                      $
+                      {((item.quantity * item.unit_price_cents) / 100).toFixed(
+                        2,
+                      )}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
 
       <h2>Expenses</h2>
       <div className="expense-toolbar">
@@ -474,6 +626,13 @@ function App() {
                   </p>
 
                   <div className="expense-actions">
+                    <button
+                      className="items-button"
+                      type="button"
+                      onClick={() => openItemsModal(expense)}
+                    >
+                      Items
+                    </button>
                     <button
                       className="edit-button"
                       type="button"

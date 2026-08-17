@@ -200,3 +200,69 @@ def get_monthly_budget(
         )
 
     return monthly_budget
+
+
+@app.post(
+    "/expenses/{expense_id}/items",
+    response_model=schemas.ExpenseItemResponse
+)
+def create_expense_item(
+    expense_id: int,
+    item: schemas.ExpenseItemCreate,
+    db: Session = Depends(get_db)
+):
+    expense = (
+        db.query(models.Expense)
+        .filter(models.Expense.id == expense_id)
+        .first()
+    )
+
+    if expense is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Expense not found"
+        )
+
+    new_item = models.ExpenseItem(
+        expense_id=expense_id,
+        name=item.name,
+        quantity=item.quantity,
+        unit=item.unit,
+        unit_price_cents=item.unit_price_cents
+    )
+
+    db.add(new_item)
+    db.commit()
+    db.refresh(new_item)
+
+    return new_item
+
+
+@app.get(
+    "/expenses/{expense_id}/items",
+    response_model=list[schemas.ExpenseItemResponse]
+)
+def get_expense_items(
+    expense_id: int,
+    db: Session = Depends(get_db)
+):
+    expense = (
+        db.query(models.Expense)
+        .filter(models.Expense.id == expense_id)
+        .first()
+    )
+
+    if expense is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Expense not found"
+        )
+
+    items = (
+        db.query(models.ExpenseItem)
+        .filter(models.ExpenseItem.expense_id == expense_id)
+        .order_by(models.ExpenseItem.id.asc())
+        .all()
+    )
+
+    return items
