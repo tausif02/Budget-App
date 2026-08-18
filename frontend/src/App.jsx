@@ -1,3 +1,4 @@
+// App.jsx
 import { useState, useEffect } from "react";
 import "./App.css";
 
@@ -46,6 +47,12 @@ function App() {
   const [monthlyBudgetCents, setMonthlyBudgetCents] = useState(null);
 
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [importResult, setImportResult] = useState(null);
+  const [pendingImportedItems, setPendingImportedItems] = useState([]);
   const [selectedExpenseForItems, setSelectedExpenseForItems] = useState(null);
 
   const [expenseItems, setExpenseItems] = useState([]);
@@ -112,6 +119,49 @@ function App() {
     setNotes("");
   }
 
+  function openImportModal() {
+    setImportFile(null);
+    setIsImportModalOpen(true);
+  }
+
+  function closeImportModal() {
+    setImportFile(null);
+    setIsImportModalOpen(false);
+  }
+
+  async function handleAnalyzeImport() {
+    if (!importFile) {
+      setImportError("Choose a document first.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", importFile);
+
+    setIsImporting(true);
+    setImportError("");
+    setImportResult(null);
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/imports/extract", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Failed to analyze document.");
+      }
+
+      setImportResult(data);
+    } catch (error) {
+      setImportError(error.message);
+    } finally {
+      setIsImporting(false);
+    }
+  }
+
   function openAddExpenseModal() {
     resetForm();
     setIsExpenseModalOpen(true);
@@ -160,6 +210,31 @@ function App() {
     if (response.ok) {
       const savedExpense = await response.json();
 
+      if (!isEditing && pendingImportedItems.length > 0) {
+        const itemResponses = await Promise.all(
+          pendingImportedItems.map((item) =>
+            fetch(`http://127.0.0.1:8000/expenses/${savedExpense.id}/items`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                name: item.name,
+                quantity: item.quantity,
+                unit: item.unit,
+                unit_price_cents: item.unit_price_cents,
+              }),
+            }),
+          ),
+        );
+
+        if (itemResponses.some((itemResponse) => !itemResponse.ok)) {
+          console.error(
+            "The transaction was saved, but some imported items failed to save.",
+          );
+        }
+      }
+
       if (isEditing) {
         setExpenses((currentExpenses) =>
           currentExpenses.map((expense) =>
@@ -169,6 +244,10 @@ function App() {
       } else {
         setExpenses((currentExpenses) => [savedExpense, ...currentExpenses]);
       }
+
+      setPendingImportedItems([]);
+      setImportResult(null);
+      setImportFile(null);
 
       closeExpenseModal();
     } else {
@@ -476,6 +555,28 @@ function App() {
       ? (priceChangeCents / previousHistoryEntry.unit_price_cents) * 100
       : 0;
 
+  async function handleAnalyzeDocument() {
+    // Your existing upload/analyze code
+  }
+
+  function reviewImportedTransaction() {
+    const transaction = importResult?.suggested_transaction;
+
+    if (!transaction) return;
+
+    setEditingExpenseId(null);
+    setAmount((transaction.amount_cents / 100).toFixed(2));
+    setCategory(transaction.category || "Other");
+    setMerchant(transaction.merchant || "");
+    setDescription(transaction.description || "");
+    setPurchaseDate(transaction.purchase_date || getTodayDate());
+    setNotes(transaction.notes || "");
+    setPendingImportedItems(transaction.items || []);
+
+    setIsImportModalOpen(false);
+    setIsExpenseModalOpen(true);
+  }
+
   return (
     <main className="app">
       <header className="app-header">
@@ -484,14 +585,112 @@ function App() {
           <p>Track your spending without connecting your bank.</p>
         </div>
 
-        <button
-          className="add-transaction-button"
-          type="button"
-          onClick={openAddExpenseModal}
-        >
-          + Add New Transaction
-        </button>
+        <div className="header-actions">
+          <button
+            className="import-transaction-button"
+            type="button"
+            onClick={openImportModal}
+          >
+            Import Document
+          </button>
+
+          <button
+            className="add-transaction-button"
+            type="button"
+            onClick={openAddExpenseModal}
+          >
+            + Add New Transaction
+          </button>
+        </div>
       </header>
+
+      {isImportModalOpen && (
+        <div className="modal-overlay" onMouseDown={closeImportModal}>
+          <section
+            className="expense-modal import-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="import-modal-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <p>Document import</p>
+                <h2 id="import-modal-title">Import Transactions</h2>
+              </div>
+
+              <button
+                className="modal-close"
+                type="button"
+                aria-label="Close document import"
+                onClick={closeImportModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <p className="import-description">
+              Upload a receipt or bank statement. You will review everything
+              before it is saved.
+            </p>
+
+            <div className="import-file-field">
+              <label htmlFor="import-file">PDF, JPG, JPEG, or PNG</label>
+
+              <input
+                id="import-file"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                onChange={(event) =>
+                  setImportFile(event.target.files?.[0] || null)
+                }
+              />
+            </div>
+
+            {importFile && (
+              <p className="selected-import-file">
+                Selected: <strong>{importFile.name}</strong>
+              </p>
+            )}
+
+            {importFile && (
+              <button
+                className="analyze-import-button"
+                type="button"
+                disabled={isImporting}
+                onClick={handleAnalyzeImport}
+              >
+                {isImporting ? "Analyzing..." : "Analyze Document"}
+              </button>
+            )}
+
+            {importError && <p className="import-error">{importError}</p>}
+
+            {importResult && (
+              <div className="import-success">
+                <strong>Document analyzed successfully</strong>
+
+                <span>
+                  {importResult.suggested_transaction.merchant}
+                  {" · $"}
+                  {(
+                    importResult.suggested_transaction.amount_cents / 100
+                  ).toFixed(2)}
+                  {" · "}
+                  {importResult.suggested_transaction.items.length} items
+                </span>
+                <button
+                  type="button"
+                  className="review-import-button"
+                  onClick={reviewImportedTransaction}
+                >
+                  Review Transaction
+                </button>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
 
       {isExpenseModalOpen && (
         <div className="modal-overlay" onMouseDown={closeExpenseModal}>

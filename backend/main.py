@@ -1,9 +1,19 @@
 # main.py
-from fastapi import FastAPI, Depends, HTTPException, Path, Query
+from fastapi import (
+    FastAPI,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    File,
+    UploadFile,
+)
+
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-
+from document_extractor import extract_document_text
+from receipt_parser import parse_receipt
 
 from database import engine, Base, SessionLocal
 import models
@@ -372,3 +382,81 @@ def get_item_price_history(
         }
         for item, expense in results
     ]
+
+
+ALLOWED_DOCUMENT_TYPES = {
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+}
+
+MAX_DOCUMENT_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
+@app.post("/imports/extract")
+async def extract_uploaded_document(
+    file: UploadFile = File(...)
+):
+    filename = file.filename
+
+    if not filename:
+        raise HTTPException(
+            status_code=400,
+            detail="The uploaded file must have a filename"
+        )
+
+    if file.content_type not in ALLOWED_DOCUMENT_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail="Only PDF, JPG, JPEG, and PNG files are supported"
+        )
+
+    try:
+        # Reading one extra byte lets us detect an oversized file.
+        file_bytes = await file.read(MAX_DOCUMENT_SIZE + 1)
+    finally:
+        await file.close()
+
+    if not file_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail="The uploaded file is empty"
+        )
+
+    if len(file_bytes) > MAX_DOCUMENT_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail="The uploaded file cannot exceed 10 MB"
+        )
+
+    try:
+        extracted_text = extract_document_text(
+            filename=filename,
+            file_bytes=file_bytes
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=415,
+            detail=str(error)
+        ) from error
+    except Exception as error:
+        raise HTTPException(
+            status_code=422,
+            detail="The document could not be read"
+        ) from error
+
+    if not extracted_text:
+        raise HTTPException(
+            status_code=422,
+            detail="No readable text was found in the document"
+        )
+
+    suggested_transaction = parse_receipt(extracted_text)
+
+    return {
+        "filename": filename,
+        "content_type": file.content_type,
+        "character_count": len(extracted_text),
+        "extracted_text": extracted_text,
+        "suggested_transaction": suggested_transaction,
+    }
