@@ -14,8 +14,6 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Prevent inputs from growing beyond their containers */
-
 *,
 *::before,
 *::after {

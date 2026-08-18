@@ -1,6 +1,7 @@
 // App.jsx
 import { useState, useEffect } from "react";
 import "./App.css";
+import PriceTracker from "./PriceTracker";
 
 function getCurrentMonth() {
   const today = new Date();
@@ -69,6 +70,7 @@ function App() {
   const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
   const [priceHistory, setPriceHistory] = useState([]);
   const [isLoadingPriceHistory, setIsLoadingPriceHistory] = useState(false);
+  const [activeSection, setActiveSection] = useState("overview");
 
   useEffect(() => {
     async function fetchExpenses() {
@@ -577,6 +579,17 @@ function App() {
     setIsExpenseModalOpen(true);
   }
 
+  function navigateToSection(sectionId) {
+    setActiveSection(sectionId);
+
+    requestAnimationFrame(() => {
+      document.getElementById(sectionId)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }
+
   return (
     <div className="dashboard-shell">
       <aside className="dashboard-sidebar">
@@ -593,13 +606,9 @@ function App() {
 
         <nav className="sidebar-nav" aria-label="Dashboard navigation">
           <button
-            className="active"
+            className={activeSection === "overview" ? "active" : ""}
             type="button"
-            onClick={() =>
-              document
-                .getElementById("overview")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }
+            onClick={() => navigateToSection("overview")}
           >
             <span className="nav-icon" aria-hidden="true">
               ▦
@@ -608,12 +617,9 @@ function App() {
           </button>
 
           <button
+            className={activeSection === "transactions" ? "active" : ""}
             type="button"
-            onClick={() =>
-              document
-                .getElementById("transactions")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }
+            onClick={() => navigateToSection("transactions")}
           >
             <span className="nav-icon" aria-hidden="true">
               ↔
@@ -622,17 +628,25 @@ function App() {
           </button>
 
           <button
+            className={activeSection === "budget-section" ? "active" : ""}
             type="button"
-            onClick={() =>
-              document
-                .getElementById("budget-section")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }
+            onClick={() => navigateToSection("budget-section")}
           >
             <span className="nav-icon" aria-hidden="true">
               $
             </span>
             Budget
+          </button>
+
+          <button
+            className={activeSection === "price-tracker" ? "active" : ""}
+            type="button"
+            onClick={() => navigateToSection("price-tracker")}
+          >
+            <span className="nav-icon" aria-hidden="true">
+              ↗
+            </span>
+            Price Tracker
           </button>
         </nav>
 
@@ -666,7 +680,14 @@ function App() {
         </div>
       </aside>
 
-      <main className="app" id="overview">
+      <main
+        className={`app ${
+          activeSection === "price-tracker"
+            ? "price-tracker-page"
+            : "overview-page"
+        }`}
+        id="overview"
+      >
         <header className="app-header">
           <div>
             <p className="page-eyebrow">Personal dashboard</p>
@@ -1243,6 +1264,8 @@ function App() {
             </section>
           </div>
         )}
+
+        <PriceTracker />
 
         <h2 id="transactions">Transactions</h2>
         <div className="expense-toolbar">

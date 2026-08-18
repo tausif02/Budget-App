@@ -344,6 +344,96 @@ def delete_expense_item(
 
 
 @app.get(
+    "/items/price-summaries",
+    response_model=list[schemas.ItemPriceSummaryResponse]
+)
+def get_item_price_summaries(
+    db: Session = Depends(get_db)
+):
+    results = (
+        db.query(models.ExpenseItem, models.Expense)
+        .join(
+            models.Expense,
+            models.Expense.id == models.ExpenseItem.expense_id
+        )
+        .order_by(
+            func.lower(models.ExpenseItem.name).asc(),
+            func.lower(models.ExpenseItem.unit).asc(),
+            models.Expense.purchase_date.desc(),
+            models.ExpenseItem.id.desc()
+        )
+        .all()
+    )
+
+    grouped_purchases = {}
+
+    for item, expense in results:
+        normalized_name = item.name.strip().lower()
+        normalized_unit = item.unit.strip().lower()
+        group_key = (normalized_name, normalized_unit)
+
+        if group_key not in grouped_purchases:
+            grouped_purchases[group_key] = []
+
+        grouped_purchases[group_key].append((item, expense))
+
+    summaries = []
+
+    for purchases in grouped_purchases.values():
+        latest_item, latest_expense = purchases[0]
+
+        previous_item = (
+            purchases[1][0]
+            if len(purchases) > 1
+            else None
+        )
+
+        previous_price_cents = (
+            previous_item.unit_price_cents
+            if previous_item is not None
+            else None
+        )
+
+        price_change_cents = (
+            latest_item.unit_price_cents - previous_price_cents
+            if previous_price_cents is not None
+            else None
+        )
+
+        price_change_percent = (
+            round(
+                (price_change_cents / previous_price_cents) * 100,
+                1
+            )
+            if previous_price_cents is not None
+            and previous_price_cents > 0
+            else None
+        )
+
+        summaries.append(
+            {
+                "name": latest_item.name,
+                "unit": latest_item.unit,
+                "purchase_count": len(purchases),
+                "latest_unit_price_cents": (
+                    latest_item.unit_price_cents
+                ),
+                "previous_unit_price_cents": previous_price_cents,
+                "price_change_cents": price_change_cents,
+                "price_change_percent": price_change_percent,
+                "latest_merchant": latest_expense.merchant,
+                "latest_purchase_date": latest_expense.purchase_date
+            }
+        )
+
+    return sorted(
+        summaries,
+        key=lambda summary: summary["latest_purchase_date"],
+        reverse=True
+    )
+
+
+@app.get(
     "/items/price-history",
     response_model=list[schemas.ItemPriceHistoryResponse]
 )

@@ -56,7 +56,6 @@ def find_merchant(text: str) -> str:
 def find_total_cents(text: str) -> int | None:
     lines = text.splitlines()
 
-    # Search backward because receipt totals are usually near the bottom.
     for line in reversed(lines):
         match = TOTAL_PATTERN.search(line)
 
@@ -89,14 +88,12 @@ def find_purchase_date(text: str) -> str | None:
 
 
 def clean_item_name(line_without_price: str) -> str:
-    # Remove long UPC/barcode numbers.
     item_name = re.sub(
         r"\b\d{8,14}\b",
         "",
         line_without_price
     )
 
-    # Remove trailing receipt flags such as F or N.
     item_name = re.sub(
         r"\s+[A-Z]\s*$",
         "",
@@ -178,7 +175,6 @@ def extract_receipt_total(text: str) -> int:
         if line.strip()
     ]
 
-    # Check TOTAL first so SUBTOTAL cannot accidentally win.
     for label in ("TOTAL", "AMOUNT DUE", "BALANCE DUE"):
         for line in lines:
             if re.match(
@@ -191,7 +187,6 @@ def extract_receipt_total(text: str) -> int:
                 if amount_cents is not None:
                     return amount_cents
 
-    # Safe fallback for receipts where OCR misses the TOTAL label.
     for line in lines:
         if re.match(
             r"^SUBTOTAL\b",
@@ -210,7 +205,6 @@ def parse_receipt(text: str) -> dict:
     items = find_receipt_items(text)
     amount_cents = extract_receipt_total(text)
 
-    # Fall back to the sum of parsed items if OCR misses the total.
     if amount_cents == 0 and items:
         amount_cents = sum(
             item.get("quantity", 1)
