@@ -578,753 +578,853 @@ function App() {
   }
 
   return (
-    <main className="app">
-      <header className="app-header">
-        <div>
-          <h1>Budget</h1>
-          <p>Track your spending without connecting your bank.</p>
+    <div className="dashboard-shell">
+      <aside className="dashboard-sidebar">
+        <div className="sidebar-brand">
+          <span className="sidebar-logo">B</span>
+
+          <div>
+            <strong>Budget</strong>
+            <small>Private finance</small>
+          </div>
         </div>
 
-        <div className="header-actions">
+        <p className="sidebar-label">Workspace</p>
+
+        <nav className="sidebar-nav" aria-label="Dashboard navigation">
           <button
-            className="import-transaction-button"
+            className="active"
             type="button"
-            onClick={openImportModal}
+            onClick={() =>
+              document
+                .getElementById("overview")
+                ?.scrollIntoView({ behavior: "smooth" })
+            }
           >
-            Import Document
+            <span className="nav-icon" aria-hidden="true">
+              ▦
+            </span>
+            Overview
           </button>
 
           <button
-            className="add-transaction-button"
+            type="button"
+            onClick={() =>
+              document
+                .getElementById("transactions")
+                ?.scrollIntoView({ behavior: "smooth" })
+            }
+          >
+            <span className="nav-icon" aria-hidden="true">
+              ↔
+            </span>
+            Transactions
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              document
+                .getElementById("budget-section")
+                ?.scrollIntoView({ behavior: "smooth" })
+            }
+          >
+            <span className="nav-icon" aria-hidden="true">
+              $
+            </span>
+            Budget
+          </button>
+        </nav>
+
+        <div className="sidebar-divider" />
+
+        <p className="sidebar-label">Actions</p>
+
+        <div className="sidebar-actions">
+          <button type="button" onClick={openImportModal}>
+            <span aria-hidden="true">↑</span>
+            Import document
+          </button>
+
+          <button
+            className="sidebar-add-button"
             type="button"
             onClick={openAddExpenseModal}
           >
-            + Add New Transaction
+            <span aria-hidden="true">+</span>
+            New transaction
           </button>
         </div>
-      </header>
 
-      {isImportModalOpen && (
-        <div className="modal-overlay" onMouseDown={closeImportModal}>
-          <section
-            className="expense-modal import-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="import-modal-title"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <div className="modal-header">
-              <div>
-                <p>Document import</p>
-                <h2 id="import-modal-title">Import Transactions</h2>
-              </div>
+        <div className="sidebar-privacy">
+          <span className="privacy-indicator" />
 
-              <button
-                className="modal-close"
-                type="button"
-                aria-label="Close document import"
-                onClick={closeImportModal}
-              >
-                ×
-              </button>
-            </div>
-
-            <p className="import-description">
-              Upload a receipt or bank statement. You will review everything
-              before it is saved.
-            </p>
-
-            <div className="import-file-field">
-              <label htmlFor="import-file">PDF, JPG, JPEG, or PNG</label>
-
-              <input
-                id="import-file"
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                onChange={(event) =>
-                  setImportFile(event.target.files?.[0] || null)
-                }
-              />
-            </div>
-
-            {importFile && (
-              <p className="selected-import-file">
-                Selected: <strong>{importFile.name}</strong>
-              </p>
-            )}
-
-            {importFile && (
-              <button
-                className="analyze-import-button"
-                type="button"
-                disabled={isImporting}
-                onClick={handleAnalyzeImport}
-              >
-                {isImporting ? "Analyzing..." : "Analyze Document"}
-              </button>
-            )}
-
-            {importError && <p className="import-error">{importError}</p>}
-
-            {importResult && (
-              <div className="import-success">
-                <strong>Document analyzed successfully</strong>
-
-                <span>
-                  {importResult.suggested_transaction.merchant}
-                  {" · $"}
-                  {(
-                    importResult.suggested_transaction.amount_cents / 100
-                  ).toFixed(2)}
-                  {" · "}
-                  {importResult.suggested_transaction.items.length} items
-                </span>
-                <button
-                  type="button"
-                  className="review-import-button"
-                  onClick={reviewImportedTransaction}
-                >
-                  Review Transaction
-                </button>
-              </div>
-            )}
-          </section>
+          <div>
+            <strong>Private by design</strong>
+            <small>No bank login required</small>
+          </div>
         </div>
-      )}
+      </aside>
 
-      {isExpenseModalOpen && (
-        <div className="modal-overlay" onMouseDown={closeExpenseModal}>
-          <section
-            className="expense-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="transaction-modal-title"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <div className="modal-header">
-              <div>
-                <p>Transaction</p>
+      <main className="app" id="overview">
+        <header className="app-header">
+          <div>
+            <p className="page-eyebrow">Personal dashboard</p>
+            <h1>Overview</h1>
+            <p>Track your spending, budget, and purchase history.</p>
+          </div>
 
-                <h2 id="transaction-modal-title">
-                  {editingExpenseId === null
-                    ? "Add New Transaction"
-                    : "Edit Transaction"}
-                </h2>
-              </div>
+          <div className="header-actions">
+            <button
+              className="import-transaction-button"
+              type="button"
+              onClick={openImportModal}
+            >
+              Import
+            </button>
 
-              <button
-                className="modal-close"
-                type="button"
-                aria-label="Close transaction form"
-                onClick={closeExpenseModal}
-              >
-                ×
-              </button>
-            </div>
+            <button
+              className="add-transaction-button"
+              type="button"
+              onClick={openAddExpenseModal}
+            >
+              + New Transaction
+            </button>
+          </div>
+        </header>
 
-            <form className="expense-form" onSubmit={handleSubmit}>
-              {" "}
-              <div>
-                <label>Amount</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  required
-                  value={amount}
-                  onChange={(event) => setAmount(event.target.value)}
-                />
-              </div>
-              <div>
-                <label>Category</label>
-                <select
-                  value={category}
-                  required
-                  onChange={(event) => setCategory(event.target.value)}
-                >
-                  <option value="">Select a category</option>
-                  <option value="Groceries">Groceries</option>
-                  <option value="Restaurants">Restaurants</option>
-                  <option value="Transportation">Transportation</option>
-                  <option value="Housing">Housing</option>
-                  <option value="Utilities">Utilities</option>
-                  <option value="Health">Health</option>
-                  <option value="Shopping">Shopping</option>
-                  <option value="Entertainment">Entertainment</option>
-                  <option value="Education">Education</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-              <div>
-                <label>Merchant</label>
-                <input
-                  type="text"
-                  value={merchant}
-                  onChange={(event) => setMerchant(event.target.value)}
-                />
-              </div>
-              <div>
-                <label>Description</label>
-                <input
-                  type="text"
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                />
-              </div>
-              <div>
-                <label>Purchase Date</label>
-                <input
-                  type="date"
-                  required
-                  value={purchaseDate}
-                  onChange={(event) => setPurchaseDate(event.target.value)}
-                />
-              </div>
-              <div>
-                <label>Notes</label>
-                <textarea
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                />
-              </div>
-              <button type="submit">
-                {editingExpenseId === null ? "Add Transaction" : "Save Changes"}
-              </button>
-              {editingExpenseId !== null && (
-                <button type="button" onClick={closeExpenseModal}>
-                  Cancel
-                </button>
-              )}
-            </form>
-          </section>
-        </div>
-      )}
-
-      {selectedExpenseForItems && (
-        <div className="modal-overlay" onMouseDown={closeItemsModal}>
-          <section
-            className="expense-modal items-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="items-modal-title"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <div className="modal-header">
-              <div>
-                <p>Transaction items</p>
-
-                <h2 id="items-modal-title">
-                  {selectedExpenseForItems.merchant || "Unknown Merchant"}
-                </h2>
-              </div>
-
-              <div className="items-header-actions">
-                {expenseItems.length > 0 && (
-                  <button
-                    className={`edit-items-toggle ${isEditingItemList ? "active" : ""}`}
-                    type="button"
-                    onClick={toggleItemListEditing}
-                  >
-                    {isEditingItemList ? "Done" : "Edit List"}
-                  </button>
-                )}
+        {isImportModalOpen && (
+          <div className="modal-overlay" onMouseDown={closeImportModal}>
+            <section
+              className="expense-modal import-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="import-modal-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="modal-header">
+                <div>
+                  <p>Document import</p>
+                  <h2 id="import-modal-title">Import Transactions</h2>
+                </div>
 
                 <button
                   className="modal-close"
                   type="button"
-                  aria-label="Close items"
-                  onClick={closeItemsModal}
+                  aria-label="Close document import"
+                  onClick={closeImportModal}
                 >
                   ×
                 </button>
               </div>
-            </div>
 
-            <p className="items-transaction-total">
-              Transaction total:{" "}
-              <strong>
-                ${(selectedExpenseForItems.amount_cents / 100).toFixed(2)}
-              </strong>
-            </p>
+              <p className="import-description">
+                Upload a receipt or bank statement. You will review everything
+                before it is saved.
+              </p>
 
-            <div className="item-balance">
-              <div>
-                <span>Items entered</span>
-                <strong>${(itemSubtotalCents / 100).toFixed(2)}</strong>
+              <div className="import-file-field">
+                <label htmlFor="import-file">PDF, JPG, JPEG, or PNG</label>
+
+                <input
+                  id="import-file"
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                  onChange={(event) =>
+                    setImportFile(event.target.files?.[0] || null)
+                  }
+                />
               </div>
 
-              <div
-                className={
-                  unaccountedCents === 0
-                    ? "item-balance-complete"
-                    : unaccountedCents < 0
-                      ? "item-balance-over"
-                      : ""
-                }
-              >
-                <span>{unaccountedCents < 0 ? "Over by" : "Unaccounted"}</span>
+              {importFile && (
+                <p className="selected-import-file">
+                  Selected: <strong>{importFile.name}</strong>
+                </p>
+              )}
 
-                <strong>
-                  ${(Math.abs(unaccountedCents) / 100).toFixed(2)}
-                </strong>
-              </div>
-            </div>
+              {importFile && (
+                <button
+                  className="analyze-import-button"
+                  type="button"
+                  disabled={isImporting}
+                  onClick={handleAnalyzeImport}
+                >
+                  {isImporting ? "Analyzing..." : "Analyze Document"}
+                </button>
+              )}
 
-            {editingItemId === null && (
-              <form className="item-form" onSubmit={handleAddItem}>
-                <div className="item-name-field">
-                  <label htmlFor="item-name">Item name</label>
+              {importError && <p className="import-error">{importError}</p>}
 
-                  <input
-                    id="item-name"
-                    type="text"
-                    required
-                    placeholder="Milk"
-                    value={itemName}
-                    onChange={(event) => setItemName(event.target.value)}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="item-quantity">Quantity</label>
+              {importResult && (
+                <div className="import-success">
+                  <strong>Document analyzed successfully</strong>
 
-                  <input
-                    id="item-quantity"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    required
-                    value={itemQuantity}
-                    onChange={(event) => setItemQuantity(event.target.value)}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="item-unit">Unit</label>
-
-                  <select
-                    id="item-unit"
-                    value={itemUnit}
-                    onChange={(event) => setItemUnit(event.target.value)}
+                  <span>
+                    {importResult.suggested_transaction.merchant}
+                    {" · $"}
+                    {(
+                      importResult.suggested_transaction.amount_cents / 100
+                    ).toFixed(2)}
+                    {" · "}
+                    {importResult.suggested_transaction.items.length} items
+                  </span>
+                  <button
+                    type="button"
+                    className="review-import-button"
+                    onClick={reviewImportedTransaction}
                   >
-                    <option value="each">Each</option>
-                    <option value="pack">Pack</option>
-                    <option value="lb">Pound</option>
-                    <option value="oz">Ounce</option>
-                    <option value="gallon">Gallon</option>
-                    <option value="liter">Liter</option>
+                    Review Transaction
+                  </button>
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {isExpenseModalOpen && (
+          <div className="modal-overlay" onMouseDown={closeExpenseModal}>
+            <section
+              className="expense-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="transaction-modal-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="modal-header">
+                <div>
+                  <p>Transaction</p>
+
+                  <h2 id="transaction-modal-title">
+                    {editingExpenseId === null
+                      ? "Add New Transaction"
+                      : "Edit Transaction"}
+                  </h2>
+                </div>
+
+                <button
+                  className="modal-close"
+                  type="button"
+                  aria-label="Close transaction form"
+                  onClick={closeExpenseModal}
+                >
+                  ×
+                </button>
+              </div>
+
+              <form className="expense-form" onSubmit={handleSubmit}>
+                {" "}
+                <div>
+                  <label>Amount</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    value={amount}
+                    onChange={(event) => setAmount(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <label>Category</label>
+                  <select
+                    value={category}
+                    required
+                    onChange={(event) => setCategory(event.target.value)}
+                  >
+                    <option value="">Select a category</option>
+                    <option value="Groceries">Groceries</option>
+                    <option value="Restaurants">Restaurants</option>
+                    <option value="Transportation">Transportation</option>
+                    <option value="Housing">Housing</option>
+                    <option value="Utilities">Utilities</option>
+                    <option value="Health">Health</option>
+                    <option value="Shopping">Shopping</option>
+                    <option value="Entertainment">Entertainment</option>
+                    <option value="Education">Education</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="item-price">Unit price</label>
-
+                  <label>Merchant</label>
                   <input
-                    id="item-price"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
+                    type="text"
+                    value={merchant}
+                    onChange={(event) => setMerchant(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <label>Description</label>
+                  <input
+                    type="text"
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <label>Purchase Date</label>
+                  <input
+                    type="date"
                     required
-                    placeholder="3.99"
-                    value={itemUnitPrice}
-                    onChange={(event) => setItemUnitPrice(event.target.value)}
+                    value={purchaseDate}
+                    onChange={(event) => setPurchaseDate(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <label>Notes</label>
+                  <textarea
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
                   />
                 </div>
                 <button type="submit">
-                  {editingItemId === null ? "Add Item" : "Save Item"}
-                </button>{" "}
+                  {editingExpenseId === null
+                    ? "Add Transaction"
+                    : "Save Changes"}
+                </button>
+                {editingExpenseId !== null && (
+                  <button type="button" onClick={closeExpenseModal}>
+                    Cancel
+                  </button>
+                )}
               </form>
-            )}
-            {isLoadingItems ? (
-              <p className="items-message">Loading items...</p>
-            ) : expenseItems.length === 0 ? (
-              <p className="items-message">
-                No items have been added to this transaction.
-              </p>
-            ) : (
-              <div className="items-list">
-                {expenseItems.map((item) =>
-                  editingItemId === item.id ? (
-                    <form
-                      className="item-row-edit-form"
-                      key={item.id}
-                      onSubmit={handleAddItem}
+            </section>
+          </div>
+        )}
+
+        {selectedExpenseForItems && !selectedHistoryItem && (
+          <div className="modal-overlay" onMouseDown={closeItemsModal}>
+            <section
+              className="expense-modal items-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="items-modal-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="modal-header">
+                <div>
+                  <p>Transaction items</p>
+
+                  <h2 id="items-modal-title">
+                    {selectedExpenseForItems.merchant || "Unknown Merchant"}
+                  </h2>
+                </div>
+
+                <div className="items-header-actions">
+                  {expenseItems.length > 0 && (
+                    <button
+                      className={`edit-items-toggle ${isEditingItemList ? "active" : ""}`}
+                      type="button"
+                      onClick={toggleItemListEditing}
                     >
-                      <input
-                        type="text"
-                        required
-                        aria-label="Item name"
-                        value={itemName}
-                        onChange={(event) => setItemName(event.target.value)}
-                      />
+                      {isEditingItemList ? "Done" : "Edit List"}
+                    </button>
+                  )}
 
-                      <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        required
-                        aria-label="Quantity"
-                        value={itemQuantity}
-                        onChange={(event) =>
-                          setItemQuantity(event.target.value)
-                        }
-                      />
+                  <button
+                    className="modal-close"
+                    type="button"
+                    aria-label="Close items"
+                    onClick={closeItemsModal}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
 
-                      <select
-                        aria-label="Unit"
-                        value={itemUnit}
-                        onChange={(event) => setItemUnit(event.target.value)}
+              <p className="items-transaction-total">
+                Transaction total:{" "}
+                <strong>
+                  ${(selectedExpenseForItems.amount_cents / 100).toFixed(2)}
+                </strong>
+              </p>
+
+              <div className="item-balance">
+                <div>
+                  <span>Items entered</span>
+                  <strong>${(itemSubtotalCents / 100).toFixed(2)}</strong>
+                </div>
+
+                <div
+                  className={
+                    unaccountedCents === 0
+                      ? "item-balance-complete"
+                      : unaccountedCents < 0
+                        ? "item-balance-over"
+                        : ""
+                  }
+                >
+                  <span>
+                    {unaccountedCents < 0 ? "Over by" : "Unaccounted"}
+                  </span>
+
+                  <strong>
+                    ${(Math.abs(unaccountedCents) / 100).toFixed(2)}
+                  </strong>
+                </div>
+              </div>
+
+              {editingItemId === null && (
+                <form className="item-form" onSubmit={handleAddItem}>
+                  <div className="item-name-field">
+                    <label htmlFor="item-name">Item name</label>
+
+                    <input
+                      id="item-name"
+                      type="text"
+                      required
+                      placeholder="Milk"
+                      value={itemName}
+                      onChange={(event) => setItemName(event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="item-quantity">Quantity</label>
+
+                    <input
+                      id="item-quantity"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      required
+                      value={itemQuantity}
+                      onChange={(event) => setItemQuantity(event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="item-unit">Unit</label>
+
+                    <select
+                      id="item-unit"
+                      value={itemUnit}
+                      onChange={(event) => setItemUnit(event.target.value)}
+                    >
+                      <option value="each">Each</option>
+                      <option value="pack">Pack</option>
+                      <option value="lb">Pound</option>
+                      <option value="oz">Ounce</option>
+                      <option value="gallon">Gallon</option>
+                      <option value="liter">Liter</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="item-price">Unit price</label>
+
+                    <input
+                      id="item-price"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      required
+                      placeholder="3.99"
+                      value={itemUnitPrice}
+                      onChange={(event) => setItemUnitPrice(event.target.value)}
+                    />
+                  </div>
+                  <button type="submit">
+                    {editingItemId === null ? "Add Item" : "Save Item"}
+                  </button>{" "}
+                </form>
+              )}
+              {isLoadingItems ? (
+                <p className="items-message">Loading items...</p>
+              ) : expenseItems.length === 0 ? (
+                <p className="items-message">
+                  No items have been added to this transaction.
+                </p>
+              ) : (
+                <div className="items-list">
+                  {expenseItems.map((item) =>
+                    editingItemId === item.id ? (
+                      <form
+                        className="item-row-edit-form"
+                        key={item.id}
+                        onSubmit={handleAddItem}
                       >
-                        <option value="each">Each</option>
-                        <option value="pack">Pack</option>
-                        <option value="lb">Pound</option>
-                        <option value="oz">Ounce</option>
-                        <option value="gallon">Gallon</option>
-                        <option value="liter">Liter</option>
-                      </select>
+                        <input
+                          type="text"
+                          required
+                          aria-label="Item name"
+                          value={itemName}
+                          onChange={(event) => setItemName(event.target.value)}
+                        />
 
-                      <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        required
-                        aria-label="Unit price"
-                        value={itemUnitPrice}
-                        onChange={(event) =>
-                          setItemUnitPrice(event.target.value)
-                        }
-                      />
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          required
+                          aria-label="Quantity"
+                          value={itemQuantity}
+                          onChange={(event) =>
+                            setItemQuantity(event.target.value)
+                          }
+                        />
 
-                      <div className="inline-item-actions">
-                        <button className="inline-save-button" type="submit">
-                          Save
-                        </button>
-
-                        <button
-                          className="inline-cancel-button"
-                          type="button"
-                          onClick={handleCancelItemEdit}
+                        <select
+                          aria-label="Unit"
+                          value={itemUnit}
+                          onChange={(event) => setItemUnit(event.target.value)}
                         >
-                          Cancel
-                        </button>
+                          <option value="each">Each</option>
+                          <option value="pack">Pack</option>
+                          <option value="lb">Pound</option>
+                          <option value="oz">Ounce</option>
+                          <option value="gallon">Gallon</option>
+                          <option value="liter">Liter</option>
+                        </select>
+
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          required
+                          aria-label="Unit price"
+                          value={itemUnitPrice}
+                          onChange={(event) =>
+                            setItemUnitPrice(event.target.value)
+                          }
+                        />
+
+                        <div className="inline-item-actions">
+                          <button className="inline-save-button" type="submit">
+                            Save
+                          </button>
+
+                          <button
+                            className="inline-cancel-button"
+                            type="button"
+                            onClick={handleCancelItemEdit}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="item-row" key={item.id}>
+                        <div className="item-details">
+                          <strong>{item.name}</strong>
+
+                          <span>
+                            {item.quantity} {item.unit} × $
+                            {(item.unit_price_cents / 100).toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="item-row-end">
+                          <strong className="item-row-total">
+                            $
+                            {(
+                              (item.quantity * item.unit_price_cents) /
+                              100
+                            ).toFixed(2)}
+                          </strong>
+                          <button
+                            className="item-history-button"
+                            type="button"
+                            onClick={() => openPriceHistory(item)}
+                          >
+                            History
+                          </button>
+                          {isEditingItemList && (
+                            <div className="item-row-actions">
+                              <button
+                                className="item-edit-button"
+                                type="button"
+                                onClick={() => handleStartEditingItem(item)}
+                              >
+                                Edit
+                              </button>
+
+                              <button
+                                className="item-delete-button"
+                                type="button"
+                                onClick={() => handleDeleteItem(item.id)}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </form>
-                  ) : (
-                    <div className="item-row" key={item.id}>
-                      <div className="item-details">
-                        <strong>{item.name}</strong>
+                    ),
+                  )}
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {selectedHistoryItem && (
+          <div
+            className="modal-overlay price-history-overlay"
+            onMouseDown={closePriceHistory}
+          >
+            <section
+              className="expense-modal price-history-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="price-history-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="modal-header">
+                <div>
+                  <p>Price tracking</p>
+
+                  <h2 id="price-history-title">
+                    {selectedHistoryItem.name} history
+                  </h2>
+                </div>
+
+                <button
+                  className="modal-close"
+                  type="button"
+                  aria-label="Close price history"
+                  onClick={closePriceHistory}
+                >
+                  ×
+                </button>
+              </div>
+
+              {canComparePrices && (
+                <div
+                  className={`price-change-summary ${
+                    priceChangeCents > 0
+                      ? "price-increase"
+                      : priceChangeCents < 0
+                        ? "price-decrease"
+                        : "price-unchanged"
+                  }`}
+                >
+                  <span>Since previous purchase</span>
+
+                  <strong>
+                    {priceChangeCents === 0 ? (
+                      "No price change"
+                    ) : (
+                      <>
+                        {priceChangeCents > 0 ? "↑" : "↓"} $
+                        {Math.abs(priceChangeCents / 100).toFixed(2)} (
+                        {priceChangeCents > 0 ? "+" : "-"}
+                        {Math.abs(priceChangePercent).toFixed(1)}%)
+                      </>
+                    )}
+                  </strong>
+                </div>
+              )}
+
+              {isLoadingPriceHistory ? (
+                <p className="items-message">Loading price history...</p>
+              ) : priceHistory.length === 0 ? (
+                <p className="items-message">
+                  No previous purchases found for this item.
+                </p>
+              ) : (
+                <div className="price-history-list">
+                  {priceHistory.map((entry) => (
+                    <div className="price-history-row" key={entry.item_id}>
+                      <div>
+                        <strong>{formatDate(entry.purchase_date)}</strong>
+                        <span>{entry.merchant || "Unknown Merchant"}</span>
+                      </div>
+
+                      <div>
+                        <strong>
+                          ${(entry.unit_price_cents / 100).toFixed(2)}
+                        </strong>
 
                         <span>
-                          {item.quantity} {item.unit} × $
-                          {(item.unit_price_cents / 100).toFixed(2)}
+                          {entry.quantity} {entry.unit}
                         </span>
                       </div>
-
-                      <div className="item-row-end">
-                        <strong className="item-row-total">
-                          $
-                          {(
-                            (item.quantity * item.unit_price_cents) /
-                            100
-                          ).toFixed(2)}
-                        </strong>
-                        <button
-                          className="item-history-button"
-                          type="button"
-                          onClick={() => openPriceHistory(item)}
-                        >
-                          History
-                        </button>
-                        {isEditingItemList && (
-                          <div className="item-row-actions">
-                            <button
-                              className="item-edit-button"
-                              type="button"
-                              onClick={() => handleStartEditingItem(item)}
-                            >
-                              Edit
-                            </button>
-
-                            <button
-                              className="item-delete-button"
-                              type="button"
-                              onClick={() => handleDeleteItem(item.id)}
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
                     </div>
-                  ),
-                )}
-              </div>
-            )}
-          </section>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        <h2 id="transactions">Transactions</h2>
+        <div className="expense-toolbar">
+          <div className="filter-control">
+            <label htmlFor="month-filter">Month</label>
+
+            <input
+              id="month-filter"
+              type="month"
+              value={selectedMonth}
+              onChange={(event) => setSelectedMonth(event.target.value)}
+            />
+          </div>
+
+          <div className="filter-control">
+            <label htmlFor="category-filter">Category</label>
+
+            <select
+              id="category-filter"
+              value={selectedCategory}
+              onChange={(event) => setSelectedCategory(event.target.value)}
+            >
+              <option value="All">All categories</option>
+              <option value="Groceries">Groceries</option>
+              <option value="Restaurants">Restaurants</option>
+              <option value="Transportation">Transportation</option>
+              <option value="Housing">Housing</option>
+              <option value="Utilities">Utilities</option>
+              <option value="Health">Health</option>
+              <option value="Shopping">Shopping</option>
+              <option value="Entertainment">Entertainment</option>
+              <option value="Education">Education</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
         </div>
-      )}
 
-      {selectedHistoryItem && (
-        <div
-          className="modal-overlay price-history-overlay"
-          onMouseDown={closePriceHistory}
+        <form
+          id="budget-section"
+          className="budget-form"
+          onSubmit={handleBudgetSubmit}
         >
-          <section
-            className="expense-modal price-history-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="price-history-title"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <div className="modal-header">
-              <div>
-                <p>Price tracking</p>
+          <div className="budget-field">
+            <label htmlFor="budget-amount">Monthly budget</label>
 
-                <h2 id="price-history-title">
-                  {selectedHistoryItem.name} history
-                </h2>
+            <div className="budget-input">
+              <span>$</span>
+
+              <input
+                id="budget-amount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                required
+                placeholder="500.00"
+                value={budgetAmount}
+                onChange={(event) => setBudgetAmount(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <button type="submit">
+            {monthlyBudgetCents === null ? "Set Budget" : "Update Budget"}
+          </button>
+        </form>
+
+        <div className="summary-card">
+          <span>
+            {selectedCategory === "All"
+              ? "Total spent"
+              : `${selectedCategory} spent`}
+          </span>{" "}
+          <strong>${(totalSpentCents / 100).toFixed(2)}</strong>
+        </div>
+
+        {monthlyBudgetCents !== null && (
+          <section
+            className={`budget-status ${isOverBudget ? "over-budget" : ""}`}
+          >
+            <div className="budget-stats">
+              <div className="budget-stat">
+                <span>Monthly budget</span>
+                <strong>${(monthlyBudgetCents / 100).toFixed(2)}</strong>
               </div>
 
-              <button
-                className="modal-close"
-                type="button"
-                aria-label="Close price history"
-                onClick={closePriceHistory}
-              >
-                ×
-              </button>
-            </div>
+              <div className="budget-stat">
+                <span>Spent this month</span>
+                <strong>${(monthlySpentCents / 100).toFixed(2)}</strong>
+              </div>
 
-            {canComparePrices && (
-              <div
-                className={`price-change-summary ${
-                  priceChangeCents > 0
-                    ? "price-increase"
-                    : priceChangeCents < 0
-                      ? "price-decrease"
-                      : "price-unchanged"
-                }`}
-              >
-                <span>Since previous purchase</span>
+              <div className="budget-stat">
+                <span>{isOverBudget ? "Over budget" : "Remaining"}</span>
 
                 <strong>
-                  {priceChangeCents === 0 ? (
-                    "No price change"
-                  ) : (
-                    <>
-                      {priceChangeCents > 0 ? "↑" : "↓"} $
-                      {Math.abs(priceChangeCents / 100).toFixed(2)} (
-                      {priceChangeCents > 0 ? "+" : "-"}
-                      {Math.abs(priceChangePercent).toFixed(1)}%)
-                    </>
-                  )}
+                  ${(Math.abs(remainingBudgetCents) / 100).toFixed(2)}
                 </strong>
               </div>
-            )}
+            </div>
 
-            {isLoadingPriceHistory ? (
-              <p className="items-message">Loading price history...</p>
-            ) : priceHistory.length === 0 ? (
-              <p className="items-message">
-                No previous purchases found for this item.
-              </p>
+            <div className="budget-progress">
+              <div
+                className="budget-progress-fill"
+                style={{
+                  width: `${progressWidth}%`,
+                }}
+              />
+            </div>
+
+            <p className="budget-progress-text">
+              {budgetUsedPercent.toFixed(0)}% of the monthly budget used
+            </p>
+          </section>
+        )}
+
+        {filteredExpenses.length === 0 ? (
+          <p className="empty-message">No expenses found for this month.</p>
+        ) : (
+          <div>
+            {filteredExpenses.length === 0 ? (
+              <p className="empty-message">No expenses yet.</p>
             ) : (
-              <div className="price-history-list">
-                {priceHistory.map((entry) => (
-                  <div className="price-history-row" key={entry.item_id}>
-                    <div>
-                      <strong>{formatDate(entry.purchase_date)}</strong>
-                      <span>{entry.merchant || "Unknown Merchant"}</span>
+              <div className="expense-list">
+                {filteredExpenses.map((expense) => (
+                  <article className="expense-card" key={expense.id}>
+                    <div className="expense-card-header">
+                      <div>
+                        <p className="expense-category">{expense.category}</p>
+
+                        <h3>{expense.merchant || "Unknown Merchant"}</h3>
+                      </div>
+
+                      <p className="expense-amount">
+                        ${(expense.amount_cents / 100).toFixed(2)}
+                      </p>
                     </div>
 
-                    <div>
-                      <strong>
-                        ${(entry.unit_price_cents / 100).toFixed(2)}
-                      </strong>
+                    {expense.description && (
+                      <p className="expense-description">
+                        {expense.description}
+                      </p>
+                    )}
 
-                      <span>
-                        {entry.quantity} {entry.unit}
-                      </span>
+                    {expense.notes && (
+                      <p className="expense-notes">{expense.notes}</p>
+                    )}
+
+                    <p className="expense-date">
+                      {formatDate(expense.purchase_date)}
+                    </p>
+
+                    <div className="expense-actions">
+                      <button
+                        className="items-button"
+                        type="button"
+                        onClick={() => openItemsModal(expense)}
+                      >
+                        Items
+                      </button>
+                      <button
+                        className="edit-button"
+                        type="button"
+                        onClick={() => handleEdit(expense)}
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        className="delete-button"
+                        type="button"
+                        onClick={() => handleDelete(expense.id)}
+                      >
+                        Delete
+                      </button>
                     </div>
-                  </div>
+                  </article>
                 ))}
               </div>
             )}
-          </section>
-        </div>
-      )}
-
-      <h2>Expenses</h2>
-      <div className="expense-toolbar">
-        <div className="filter-control">
-          <label htmlFor="month-filter">Month</label>
-
-          <input
-            id="month-filter"
-            type="month"
-            value={selectedMonth}
-            onChange={(event) => setSelectedMonth(event.target.value)}
-          />
-        </div>
-
-        <div className="filter-control">
-          <label htmlFor="category-filter">Category</label>
-
-          <select
-            id="category-filter"
-            value={selectedCategory}
-            onChange={(event) => setSelectedCategory(event.target.value)}
-          >
-            <option value="All">All categories</option>
-            <option value="Groceries">Groceries</option>
-            <option value="Restaurants">Restaurants</option>
-            <option value="Transportation">Transportation</option>
-            <option value="Housing">Housing</option>
-            <option value="Utilities">Utilities</option>
-            <option value="Health">Health</option>
-            <option value="Shopping">Shopping</option>
-            <option value="Entertainment">Entertainment</option>
-            <option value="Education">Education</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-      </div>
-
-      <form className="budget-form" onSubmit={handleBudgetSubmit}>
-        <div className="budget-field">
-          <label htmlFor="budget-amount">Monthly budget</label>
-
-          <div className="budget-input">
-            <span>$</span>
-
-            <input
-              id="budget-amount"
-              type="number"
-              min="0.01"
-              step="0.01"
-              required
-              placeholder="500.00"
-              value={budgetAmount}
-              onChange={(event) => setBudgetAmount(event.target.value)}
-            />
           </div>
-        </div>
-
-        <button type="submit">
-          {monthlyBudgetCents === null ? "Set Budget" : "Update Budget"}
-        </button>
-      </form>
-
-      <div className="summary-card">
-        <span>
-          {selectedCategory === "All"
-            ? "Total spent"
-            : `${selectedCategory} spent`}
-        </span>{" "}
-        <strong>${(totalSpentCents / 100).toFixed(2)}</strong>
-      </div>
-
-      {monthlyBudgetCents !== null && (
-        <section
-          className={`budget-status ${isOverBudget ? "over-budget" : ""}`}
-        >
-          <div className="budget-stats">
-            <div className="budget-stat">
-              <span>Monthly budget</span>
-              <strong>${(monthlyBudgetCents / 100).toFixed(2)}</strong>
-            </div>
-
-            <div className="budget-stat">
-              <span>Spent this month</span>
-              <strong>${(monthlySpentCents / 100).toFixed(2)}</strong>
-            </div>
-
-            <div className="budget-stat">
-              <span>{isOverBudget ? "Over budget" : "Remaining"}</span>
-
-              <strong>
-                ${(Math.abs(remainingBudgetCents) / 100).toFixed(2)}
-              </strong>
-            </div>
-          </div>
-
-          <div className="budget-progress">
-            <div
-              className="budget-progress-fill"
-              style={{
-                width: `${progressWidth}%`,
-              }}
-            />
-          </div>
-
-          <p className="budget-progress-text">
-            {budgetUsedPercent.toFixed(0)}% of the monthly budget used
-          </p>
-        </section>
-      )}
-
-      {filteredExpenses.length === 0 ? (
-        <p className="empty-message">No expenses found for this month.</p>
-      ) : (
-        <div>
-          {filteredExpenses.length === 0 ? (
-            <p className="empty-message">No expenses yet.</p>
-          ) : (
-            <div className="expense-list">
-              {filteredExpenses.map((expense) => (
-                <article className="expense-card" key={expense.id}>
-                  <div className="expense-card-header">
-                    <div>
-                      <p className="expense-category">{expense.category}</p>
-
-                      <h3>{expense.merchant || "Unknown Merchant"}</h3>
-                    </div>
-
-                    <p className="expense-amount">
-                      ${(expense.amount_cents / 100).toFixed(2)}
-                    </p>
-                  </div>
-
-                  {expense.description && (
-                    <p className="expense-description">{expense.description}</p>
-                  )}
-
-                  {expense.notes && (
-                    <p className="expense-notes">{expense.notes}</p>
-                  )}
-
-                  <p className="expense-date">
-                    {formatDate(expense.purchase_date)}
-                  </p>
-
-                  <div className="expense-actions">
-                    <button
-                      className="items-button"
-                      type="button"
-                      onClick={() => openItemsModal(expense)}
-                    >
-                      Items
-                    </button>
-                    <button
-                      className="edit-button"
-                      type="button"
-                      onClick={() => handleEdit(expense)}
-                    >
-                      Edit
-                    </button>
-
-                    <button
-                      className="delete-button"
-                      type="button"
-                      onClick={() => handleDelete(expense.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </main>
+        )}
+      </main>
+    </div>
   );
 }
 
