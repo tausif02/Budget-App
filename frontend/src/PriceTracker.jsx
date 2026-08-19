@@ -1,5 +1,6 @@
 // PriceTracker.jsx
 import { useCallback, useEffect, useState } from "react";
+import ProductNameManager from "./ProductNameManager";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -28,6 +29,7 @@ function PriceTracker() {
   const [priceHistory, setPriceHistory] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState("");
+  const [isNameManagerOpen, setIsNameManagerOpen] = useState(false);
 
   const loadPriceSummaries = useCallback(async () => {
     setIsLoadingSummaries(true);
@@ -137,6 +139,10 @@ function PriceTracker() {
       ? (historyChangeCents / previousHistoryEntry.unit_price_cents) * 100
       : 0;
 
+  const availableProductNames = [
+    ...new Set(priceSummaries.map((summary) => summary.name)),
+  ].sort((firstName, secondName) => firstName.localeCompare(secondName));
+
   return (
     <>
       <section className="price-tracker-section" id="price-tracker">
@@ -161,6 +167,14 @@ function PriceTracker() {
                 onChange={(event) => setPriceSearch(event.target.value)}
               />
             </label>
+
+            <button
+              className="refresh-prices-button manage-product-names-button"
+              type="button"
+              onClick={() => setIsNameManagerOpen(true)}
+            >
+              Manage Names
+            </button>
 
             <button
               className="refresh-prices-button"
@@ -284,6 +298,12 @@ function PriceTracker() {
           </div>
         )}
       </section>
+      <ProductNameManager
+        isOpen={isNameManagerOpen}
+        onClose={() => setIsNameManagerOpen(false)}
+        onAliasesChanged={loadPriceSummaries}
+        availableNames={availableProductNames}
+      />
 
       {selectedProduct && (
         <div

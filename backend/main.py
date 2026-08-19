@@ -1,4 +1,5 @@
 # main.py
+import re
 from fastapi import (
     FastAPI,
     Depends,
@@ -43,6 +44,59 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def normalize_item_name(value: str) -> str:
+    normalized_value = value.casefold().strip()
+
+    normalized_value = re.sub(
+        r"[\W_]+",
+        " ",
+        normalized_value
+    )
+
+    normalized_value = re.sub(
+        r"\s+",
+        " ",
+        normalized_value
+    )
+
+    return normalized_value.strip()
+
+
+def get_item_alias_map(
+    db: Session
+) -> dict[str, models.ItemNameAlias]:
+    aliases = db.query(models.ItemNameAlias).all()
+
+    return {
+        alias.normalized_raw_name: alias
+        for alias in aliases
+    }
+
+
+def resolve_item_name(
+    item_name: str,
+    alias_map: dict[str, models.ItemNameAlias]
+) -> tuple[str, str]:
+    display_name = item_name.strip()
+    normalized_name = normalize_item_name(display_name)
+    visited_names = set()
+
+    while (
+        normalized_name in alias_map
+        and normalized_name not in visited_names
+    ):
+        visited_names.add(normalized_name)
+
+        item_alias = alias_map[normalized_name]
+
+        display_name = item_alias.canonical_name
+        normalized_name = (
+            item_alias.normalized_canonical_name
+        )
+
+    return display_name, normalized_name
 
 
 @app.get("/")
@@ -343,6 +397,113 @@ def delete_expense_item(
     return {"message": "Expense item deleted"}
 
 
+@app.put(
+    "/items/name-aliases",
+    response_model=schemas.ItemNameAliasResponse
+)
+def upsert_item_name_alias(
+    alias_data: schemas.ItemNameAliasUpsert,
+    db: Session = Depends(get_db)
+):
+    raw_name = alias_data.raw_name.strip()
+    canonical_name = alias_data.canonical_name.strip()
+
+    normalized_raw_name = normalize_item_name(raw_name)
+    normalized_canonical_name = normalize_item_name(
+        canonical_name
+    )
+
+    if not normalized_raw_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Raw item name cannot be empty"
+        )
+
+    if not normalized_canonical_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Canonical item name cannot be empty"
+        )
+
+    item_alias = (
+        db.query(models.ItemNameAlias)
+        .filter(
+            models.ItemNameAlias.normalized_raw_name
+            == normalized_raw_name
+        )
+        .first()
+    )
+
+    if item_alias is None:
+        item_alias = models.ItemNameAlias(
+            raw_name=raw_name,
+            normalized_raw_name=normalized_raw_name,
+            canonical_name=canonical_name,
+            normalized_canonical_name=(
+                normalized_canonical_name
+            )
+        )
+
+        db.add(item_alias)
+    else:
+        item_alias.raw_name = raw_name
+        item_alias.canonical_name = canonical_name
+        item_alias.normalized_canonical_name = (
+            normalized_canonical_name
+        )
+
+    db.commit()
+    db.refresh(item_alias)
+
+    return item_alias
+
+
+@app.get(
+    "/items/name-aliases",
+    response_model=list[schemas.ItemNameAliasResponse]
+)
+def get_item_name_aliases(
+    db: Session = Depends(get_db)
+):
+    aliases = (
+        db.query(models.ItemNameAlias)
+        .order_by(
+            models.ItemNameAlias.canonical_name.asc(),
+            models.ItemNameAlias.raw_name.asc()
+        )
+        .all()
+    )
+
+    return aliases
+
+
+@app.delete("/items/name-aliases/{alias_id}")
+def delete_item_name_alias(
+    alias_id: int,
+    db: Session = Depends(get_db)
+):
+    item_alias = (
+        db.query(models.ItemNameAlias)
+        .filter(models.ItemNameAlias.id == alias_id)
+        .first()
+    )
+
+    if item_alias is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Item-name alias not found"
+        )
+
+    db.delete(item_alias)
+    db.commit()
+
+    return {"message": "Item-name alias deleted"}
+
+
+@app.get(
+    "/items/price-summaries",
+    response_model=list[schemas.ItemPriceSummaryResponse]
+)
 @app.get(
     "/items/price-summaries",
     response_model=list[schemas.ItemPriceSummaryResponse]
@@ -350,6 +511,8 @@ def delete_expense_item(
 def get_item_price_summaries(
     db: Session = Depends(get_db)
 ):
+    alias_map = get_item_alias_map(db)
+
     results = (
         db.query(models.ExpenseItem, models.Expense)
         .join(
@@ -357,8 +520,6 @@ def get_item_price_summaries(
             models.Expense.id == models.ExpenseItem.expense_id
         )
         .order_by(
-            func.lower(models.ExpenseItem.name).asc(),
-            func.lower(models.ExpenseItem.unit).asc(),
             models.Expense.purchase_date.desc(),
             models.ExpenseItem.id.desc()
         )
@@ -368,18 +529,30 @@ def get_item_price_summaries(
     grouped_purchases = {}
 
     for item, expense in results:
-        normalized_name = item.name.strip().lower()
-        normalized_unit = item.unit.strip().lower()
+        canonical_name, normalized_name = resolve_item_name(
+            item.name,
+            alias_map
+        )
+
+        normalized_unit = normalize_item_name(item.unit)
         group_key = (normalized_name, normalized_unit)
 
         if group_key not in grouped_purchases:
-            grouped_purchases[group_key] = []
+            grouped_purchases[group_key] = {
+                "name": canonical_name,
+                "unit": item.unit.strip(),
+                "purchases": [],
+            }
 
-        grouped_purchases[group_key].append((item, expense))
+        grouped_purchases[group_key]["purchases"].append(
+            (item, expense)
+        )
 
     summaries = []
 
-    for purchases in grouped_purchases.values():
+    for group in grouped_purchases.values():
+        purchases = group["purchases"]
+
         latest_item, latest_expense = purchases[0]
 
         previous_item = (
@@ -412,8 +585,8 @@ def get_item_price_summaries(
 
         summaries.append(
             {
-                "name": latest_item.name,
-                "unit": latest_item.unit,
+                "name": group["name"],
+                "unit": group["unit"],
                 "purchase_count": len(purchases),
                 "latest_unit_price_cents": (
                     latest_item.unit_price_cents
@@ -422,7 +595,9 @@ def get_item_price_summaries(
                 "price_change_cents": price_change_cents,
                 "price_change_percent": price_change_percent,
                 "latest_merchant": latest_expense.merchant,
-                "latest_purchase_date": latest_expense.purchase_date
+                "latest_purchase_date": (
+                    latest_expense.purchase_date
+                ),
             }
         )
 
@@ -439,18 +614,30 @@ def get_item_price_summaries(
 )
 def get_item_price_history(
     name: str = Query(min_length=1),
+    unit: str | None = Query(
+        default=None,
+        min_length=1
+    ),
     db: Session = Depends(get_db)
 ):
-    normalized_name = name.strip().lower()
+    alias_map = get_item_alias_map(db)
+
+    _, requested_normalized_name = resolve_item_name(
+        name,
+        alias_map
+    )
+
+    requested_normalized_unit = (
+        normalize_item_name(unit)
+        if unit is not None
+        else None
+    )
 
     results = (
         db.query(models.ExpenseItem, models.Expense)
         .join(
             models.Expense,
             models.Expense.id == models.ExpenseItem.expense_id
-        )
-        .filter(
-            func.lower(models.ExpenseItem.name) == normalized_name
         )
         .order_by(
             models.Expense.purchase_date.desc(),
@@ -459,19 +646,39 @@ def get_item_price_history(
         .all()
     )
 
-    return [
-        {
-            "item_id": item.id,
-            "expense_id": expense.id,
-            "name": item.name,
-            "quantity": item.quantity,
-            "unit": item.unit,
-            "unit_price_cents": item.unit_price_cents,
-            "merchant": expense.merchant,
-            "purchase_date": expense.purchase_date
-        }
-        for item, expense in results
-    ]
+    history = []
+
+    for item, expense in results:
+        canonical_name, normalized_name = resolve_item_name(
+            item.name,
+            alias_map
+        )
+
+        normalized_unit = normalize_item_name(item.unit)
+
+        if normalized_name != requested_normalized_name:
+            continue
+
+        if (
+            requested_normalized_unit is not None
+            and normalized_unit != requested_normalized_unit
+        ):
+            continue
+
+        history.append(
+            {
+                "item_id": item.id,
+                "expense_id": expense.id,
+                "name": canonical_name,
+                "quantity": item.quantity,
+                "unit": item.unit,
+                "unit_price_cents": item.unit_price_cents,
+                "merchant": expense.merchant,
+                "purchase_date": expense.purchase_date,
+            }
+        )
+
+    return history
 
 
 ALLOWED_DOCUMENT_TYPES = {

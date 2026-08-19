@@ -87,3 +87,15 @@ class ItemPriceSummaryResponse(BaseModel):
     price_change_percent: float | None
     latest_merchant: str | None
     latest_purchase_date: date
+
+
+class ItemNameAliasUpsert(BaseModel):
+    raw_name: str = Field(min_length=1)
+    canonical_name: str = Field(min_length=1)
+
+
+class ItemNameAliasResponse(ItemNameAliasUpsert):
+    id: int
+
+    class Config:
+        from_attributes = True

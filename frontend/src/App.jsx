@@ -669,15 +669,6 @@ function App() {
             New transaction
           </button>
         </div>
-
-        <div className="sidebar-privacy">
-          <span className="privacy-indicator" />
-
-          <div>
-            <strong>Private by design</strong>
-            <small>No bank login required</small>
-          </div>
-        </div>
       </aside>
 
       <main

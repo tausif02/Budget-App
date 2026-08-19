@@ -1,5 +1,4 @@
 # receipt_parser.py
-
 import re
 from datetime import datetime
 
