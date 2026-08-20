@@ -17,6 +17,10 @@ receipts/
 .env.*
 !.env.example
 
+.env
+*.pem
+WM_IO_*
+
 # Node / React
 frontend/node_modules/
 frontend/dist/
