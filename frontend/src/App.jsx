@@ -190,7 +190,7 @@ function App() {
 
     const expenseData = {
       amount_cents: Math.round(Number(amount) * 100),
-      category: category,
+      category,
       merchant: merchant || null,
       description: description || null,
       purchase_date: purchaseDate,
@@ -199,47 +199,53 @@ function App() {
 
     const isEditing = editingExpenseId !== null;
 
-    const url = isEditing
-      ? `http://127.0.0.1:8000/expenses/${editingExpenseId}`
-      : "http://127.0.0.1:8000/expenses";
+    const isAtomicImport = !isEditing && isReviewingImport;
 
-    const method = isEditing ? "PUT" : "POST";
+    let url;
+    let method;
+    let requestBody;
 
-    const response = await fetch(url, {
-      method: method,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(expenseData),
-    });
+    if (isAtomicImport) {
+      url = "http://127.0.0.1:8000/expenses-with-items";
 
-    if (response.ok) {
-      const savedExpense = await response.json();
+      method = "POST";
 
-      if (!isEditing && pendingImportedItems.length > 0) {
-        const itemResponses = await Promise.all(
-          pendingImportedItems.map((item) =>
-            fetch(`http://127.0.0.1:8000/expenses/${savedExpense.id}/items`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                name: item.name.trim(),
-                quantity: Number(item.quantity),
-                unit: item.unit,
-                unit_price_cents: Number(item.unit_price_cents),
-              }),
-            }),
-          ),
-        );
+      requestBody = {
+        ...expenseData,
+        items: pendingImportedItems.map((item) => ({
+          name: item.name.trim(),
+          quantity: Number(item.quantity),
+          unit: item.unit,
+          unit_price_cents: Number(item.unit_price_cents),
+        })),
+      };
+    } else {
+      url = isEditing
+        ? `http://127.0.0.1:8000/expenses/${editingExpenseId}`
+        : "http://127.0.0.1:8000/expenses";
 
-        if (itemResponses.some((itemResponse) => !itemResponse.ok)) {
-          console.error(
-            "The transaction was saved, but some imported items failed to save.",
-          );
-        }
+      method = isEditing ? "PUT" : "POST";
+      requestBody = expenseData;
+    }
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        console.error(responseData.detail || "Failed to save transaction");
+
+        return;
       }
+
+      const savedExpense = responseData;
 
       if (isEditing) {
         setExpenses((currentExpenses) =>
@@ -252,12 +258,13 @@ function App() {
       }
 
       setPendingImportedItems([]);
+      setIsReviewingImport(false);
       setImportResult(null);
       setImportFile(null);
 
       closeExpenseModal();
-    } else {
-      console.log("Failed to save expense");
+    } catch (error) {
+      console.error("Failed to connect to the Budget API", error);
     }
   }
 

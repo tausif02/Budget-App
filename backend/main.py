@@ -1,5 +1,4 @@
 # main.py
-import re
 from fastapi import (
     FastAPI,
     Depends,
@@ -15,6 +14,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from document_extractor import extract_document_text
 from receipt_parser import parse_receipt
+from item_name_utils import normalize_item_name
+
 
 from database import engine, Base, SessionLocal
 import models
@@ -44,24 +45,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-
-def normalize_item_name(value: str) -> str:
-    normalized_value = value.casefold().strip()
-
-    normalized_value = re.sub(
-        r"[\W_]+",
-        " ",
-        normalized_value
-    )
-
-    normalized_value = re.sub(
-        r"\s+",
-        " ",
-        normalized_value
-    )
-
-    return normalized_value.strip()
 
 
 def get_item_alias_map(
@@ -123,6 +106,90 @@ def create_expense(
     db.refresh(new_expense)
 
     return new_expense
+
+
+@app.post(
+    "/expenses-with-items",
+    response_model=schemas.ExpenseWithItemsResponse
+)
+def create_expense_with_items(
+    expense_data: schemas.ExpenseWithItemsCreate,
+    db: Session = Depends(get_db)
+):
+    cleaned_items = []
+
+    for item_data in expense_data.items:
+        cleaned_name = item_data.name.strip()
+        cleaned_unit = item_data.unit.strip()
+
+        if not cleaned_name:
+            raise HTTPException(
+                status_code=400,
+                detail="Every item must have a name"
+            )
+
+        if not cleaned_unit:
+            raise HTTPException(
+                status_code=400,
+                detail="Every item must have a unit"
+            )
+
+        cleaned_items.append(
+            {
+                "name": cleaned_name,
+                "quantity": item_data.quantity,
+                "unit": cleaned_unit,
+                "unit_price_cents": (
+                    item_data.unit_price_cents
+                ),
+            }
+        )
+
+    try:
+        new_expense = models.Expense(
+            amount_cents=expense_data.amount_cents,
+            category=expense_data.category,
+            merchant=expense_data.merchant,
+            description=expense_data.description,
+            purchase_date=expense_data.purchase_date,
+            notes=expense_data.notes,
+        )
+
+        db.add(new_expense)
+
+        # Obtain the new expense ID without committing yet.
+        db.flush()
+
+        for item_data in cleaned_items:
+            new_item = models.ExpenseItem(
+                expense_id=new_expense.id,
+                name=item_data["name"],
+                quantity=item_data["quantity"],
+                unit=item_data["unit"],
+                unit_price_cents=(
+                    item_data["unit_price_cents"]
+                ),
+            )
+
+            db.add(new_item)
+
+        # The expense and every item are committed together.
+        db.commit()
+        db.refresh(new_expense)
+
+        return new_expense
+
+    except Exception as error:
+        # If any database operation fails, nothing is saved.
+        db.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "The transaction and its items "
+                "could not be saved"
+            ),
+        ) from error
 
 
 @app.get("/expenses", response_model=list[schemas.ExpenseResponse])
@@ -500,10 +567,6 @@ def delete_item_name_alias(
     return {"message": "Item-name alias deleted"}
 
 
-@app.get(
-    "/items/price-summaries",
-    response_model=list[schemas.ItemPriceSummaryResponse]
-)
 @app.get(
     "/items/price-summaries",
     response_model=list[schemas.ItemPriceSummaryResponse]

@@ -39,6 +39,12 @@ class ExpenseItemUpdate(BaseModel):
     unit_price_cents: int = Field(gt=0)
 
 
+class ExpenseWithItemsCreate(ExpenseCreate):
+    items: list[ExpenseItemCreate] = Field(
+        default_factory=list
+    )
+
+
 class ExpenseItemResponse(ExpenseItemCreate):
     id: int
     expense_id: int
@@ -49,6 +55,13 @@ class ExpenseItemResponse(ExpenseItemCreate):
 
 class ExpenseResponse(ExpenseCreate):
     id: int
+
+    class Config:
+        from_attributes = True
+
+
+class ExpenseWithItemsResponse(ExpenseResponse):
+    items: list[ExpenseItemResponse]
 
     class Config:
         from_attributes = True
