@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import "./App.css";
 import PriceTracker from "./PriceTracker";
+import ImportedItemsReview from "./ImportedItemsReview";
 
 function getCurrentMonth() {
   const today = new Date();
@@ -54,6 +55,7 @@ function App() {
   const [importError, setImportError] = useState("");
   const [importResult, setImportResult] = useState(null);
   const [pendingImportedItems, setPendingImportedItems] = useState([]);
+  const [isReviewingImport, setIsReviewingImport] = useState(false);
   const [selectedExpenseForItems, setSelectedExpenseForItems] = useState(null);
 
   const [expenseItems, setExpenseItems] = useState([]);
@@ -119,6 +121,8 @@ function App() {
     setDescription("");
     setPurchaseDate(getTodayDate());
     setNotes("");
+    setPendingImportedItems([]);
+    setIsReviewingImport(false);
   }
 
   function openImportModal() {
@@ -221,10 +225,10 @@ function App() {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                name: item.name,
-                quantity: item.quantity,
+                name: item.name.trim(),
+                quantity: Number(item.quantity),
                 unit: item.unit,
-                unit_price_cents: item.unit_price_cents,
+                unit_price_cents: Number(item.unit_price_cents),
               }),
             }),
           ),
@@ -476,6 +480,8 @@ function App() {
   }
 
   function handleEdit(expense) {
+    setPendingImportedItems([]);
+    setIsReviewingImport(false);
     setEditingExpenseId(expense.id);
     setAmount((expense.amount_cents / 100).toFixed(2));
     setCategory(expense.category);
@@ -564,7 +570,9 @@ function App() {
   function reviewImportedTransaction() {
     const transaction = importResult?.suggested_transaction;
 
-    if (!transaction) return;
+    if (!transaction) {
+      return;
+    }
 
     setEditingExpenseId(null);
     setAmount((transaction.amount_cents / 100).toFixed(2));
@@ -574,6 +582,7 @@ function App() {
     setPurchaseDate(transaction.purchase_date || getTodayDate());
     setNotes(transaction.notes || "");
     setPendingImportedItems(transaction.items || []);
+    setIsReviewingImport(true);
 
     setIsImportModalOpen(false);
     setIsExpenseModalOpen(true);
@@ -796,7 +805,9 @@ function App() {
         {isExpenseModalOpen && (
           <div className="modal-overlay" onMouseDown={closeExpenseModal}>
             <section
-              className="expense-modal"
+              className={`expense-modal ${
+                isReviewingImport ? "import-review-modal" : ""
+              }`}
               role="dialog"
               aria-modal="true"
               aria-labelledby="transaction-modal-title"
@@ -888,6 +899,15 @@ function App() {
                     onChange={(event) => setNotes(event.target.value)}
                   />
                 </div>
+                {isReviewingImport && (
+                  <ImportedItemsReview
+                    items={pendingImportedItems}
+                    transactionAmountCents={
+                      Math.round(Number(amount) * 100) || 0
+                    }
+                    onItemsChange={setPendingImportedItems}
+                  />
+                )}
                 <button type="submit">
                   {editingExpenseId === null
                     ? "Add Transaction"
